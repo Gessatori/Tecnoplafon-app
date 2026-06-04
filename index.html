@@ -45,7 +45,13 @@
       try{
         await sb.auth.signOut();
         let profile = null;
-        if(user.includes('@')){
+        const userLow = user.toLowerCase();
+        // V67: accesso admin locale con la password storica dell'app.
+        // Evita il doppio login e non richiede Supabase Auth per l'admin.
+        if(String(pass) === 'TP2026' && (userLow.includes('info@tecnoplafon') || userLow === 'admin' || userLow.includes('tecnoplafon'))){
+          profile = {id:'local-admin', nome:'Admin Tecnoplafon', email:'info@tecnoplafon.ch', ruolo:'admin', stato:'Attivo', sorgente:'admin-locale'};
+        }
+        if(!profile && user.includes('@')){
           const res = await sb.auth.signInWithPassword({email:user,password:pass});
           if(!res.error && res.data && res.data.user){
             const pr = await sb.from('profili').select('id,nome,email,ruolo,stato').eq('id',res.data.user.id).maybeSingle();
@@ -66,8 +72,13 @@
         if(String(profile.stato||'Attivo').toLowerCase() !== 'attivo') throw new Error('Accesso bloccato: utente non attivo.');
         sessionStorage.setItem('tp_current_user_v66', JSON.stringify(profile));
         localStorage.setItem('tp_current_user_v66', JSON.stringify(profile));
-        if(isAdminRole(profile.ruolo)) window.location.href = 'admin.html';
-        else window.location.href = 'operaio.html';
+        if(isAdminRole(profile.ruolo)) {
+          sessionStorage.setItem('tecnoplafonAdminUnlocked','1');
+          window.location.href = 'admin.html';
+        } else {
+          sessionStorage.removeItem('tecnoplafonAdminUnlocked');
+          window.location.href = 'operaio.html';
+        }
       }catch(e){ showErr('Login fallito: ' + (e.message || e)); btn.disabled=false; }
     }
   </script>
