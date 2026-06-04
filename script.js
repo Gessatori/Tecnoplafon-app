@@ -5365,3 +5365,122 @@ window.tpLogoutTecnoplafonFinale = async function(){
     window.location.href = 'index.html';
   };
 })();
+
+
+/* ===== V67 - Fix pagine separate: admin senza doppia password + email collaboratore ===== */
+(function(){
+  function tpGetCurrentUserV67(){
+    try{
+      var raw = sessionStorage.getItem('tp_current_user_v66') || localStorage.getItem('tp_current_user_v66');
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function normV67(v){ return String(v || '').trim().toLowerCase(); }
+  function isAdminV67(p){ var r = normV67(p && p.ruolo); return r === 'admin' || r === 'amministratore' || r === 'caposquadra' || r.indexOf('capo') >= 0; }
+
+  // Sulle pagine separate non deve riapparire il login completo del vecchio script.
+  if(window.TP_PAGE_MODE){
+    window.tpShowLogin = function(){
+      document.body.classList.add('tp-auth-ok');
+      if(window.TP_PAGE_MODE === 'admin') document.body.classList.add('admin-view');
+      if(window.TP_PAGE_MODE === 'operaio') document.body.classList.add('worker-view','tp-worker-mode');
+    };
+  }
+
+  function unlockAdminV67(){
+    if(window.TP_PAGE_MODE !== 'admin') return;
+    try{ adminUnlocked = true; }catch(e){}
+    try{ sessionStorage.setItem('tecnoplafonAdminUnlocked','1'); }catch(e){}
+    document.body.classList.add('tp-auth-ok','admin-view');
+    document.body.classList.remove('worker-view','tp-worker-mode');
+    ['tpFullLogin','adminAccessPanel','adminFloatingBtn','adminAccessBtn'].forEach(function(id){
+      var el = document.getElementById(id); if(el) el.remove();
+    });
+  }
+
+  function cleanOperaioV67(){
+    if(window.TP_PAGE_MODE !== 'operaio') return;
+    try{ adminUnlocked = false; }catch(e){}
+    try{ sessionStorage.removeItem('tecnoplafonAdminUnlocked'); }catch(e){}
+    document.body.classList.add('tp-auth-ok','worker-view','tp-worker-mode');
+    document.body.classList.remove('admin-view');
+  }
+
+  var oldShowSectionV67 = window.showSection;
+  if(typeof oldShowSectionV67 === 'function' && !oldShowSectionV67.__tpV67){
+    window.showSection = function(id){
+      if(window.TP_PAGE_MODE === 'admin'){
+        unlockAdminV67();
+        // Admin può aprire tutto senza seconda password.
+        return oldShowSectionV67.apply(this, arguments);
+      }
+      if(window.TP_PAGE_MODE === 'operaio'){
+        cleanOperaioV67();
+        if(id !== 'operaio') return false;
+      }
+      return oldShowSectionV67.apply(this, arguments);
+    };
+    window.showSection.__tpV67 = true;
+  }
+
+  window.tpInviaRichiestaEmailOperaio = function(){
+    var p = tpGetCurrentUserV67() || {};
+    var nome = p.nome || 'Collaboratore';
+    var email = p.email || '';
+    var tipo = document.getElementById('mTipoRichiesta')?.value || 'Richiesta';
+    var da = document.getElementById('mVacDa')?.value || '';
+    var a = document.getElementById('mVacA')?.value || da;
+    var note = document.getElementById('mVacNote')?.value || '';
+    function fmt(d){
+      d = String(d || '');
+      if(/^\d{4}-\d{2}-\d{2}$/.test(d)){ var x=d.split('-'); return x[2]+'.'+x[1]+'.'+x[0]; }
+      return d || '-';
+    }
+    var periodo = (a && a !== da) ? ('Dal ' + fmt(da) + ' al ' + fmt(a)) : fmt(da);
+    var subject = 'Tecnoplafon - Richiesta ' + tipo + ' - ' + nome;
+    var body = [
+      'NUOVA RICHIESTA COLLABORATORE',
+      'Tecnoplafon - Gestione Ore',
+      '',
+      'Collaboratore: ' + nome,
+      email ? ('Email: ' + email) : '',
+      '',
+      'Tipo richiesta: ' + tipo,
+      'Periodo: ' + periodo,
+      'Note: ' + (note || '-'),
+      '',
+      'Stato: DA CONTROLLARE',
+      'Inviata il: ' + new Date().toLocaleString('it-CH')
+    ].filter(Boolean).join('\n');
+    var href = 'mailto:info@tecnoplafon.ch?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    var link = document.createElement('a');
+    link.href = href;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(function(){ try{ link.remove(); }catch(e){} }, 500);
+    try{ closeWorkerWindow(); }catch(e){}
+  };
+
+  document.addEventListener('DOMContentLoaded', function(){
+    if(window.TP_PAGE_MODE === 'admin'){
+      var p = tpGetCurrentUserV67();
+      if(!p){ window.location.replace('index.html'); return; }
+      if(!isAdminV67(p)){ window.location.replace('operaio.html'); return; }
+      unlockAdminV67();
+      setTimeout(function(){ unlockAdminV67(); try{ showSection('admin'); }catch(e){} }, 0);
+      setTimeout(unlockAdminV67, 500);
+    }
+    if(window.TP_PAGE_MODE === 'operaio'){
+      var p2 = tpGetCurrentUserV67();
+      if(!p2){ window.location.replace('index.html'); return; }
+      if(isAdminV67(p2)){ window.location.replace('admin.html'); return; }
+      cleanOperaioV67();
+      setTimeout(cleanOperaioV67, 500);
+    }
+  });
+  window.addEventListener('load', function(){
+    if(window.TP_PAGE_MODE === 'admin') unlockAdminV67();
+    if(window.TP_PAGE_MODE === 'operaio') cleanOperaioV67();
+  });
+})();
