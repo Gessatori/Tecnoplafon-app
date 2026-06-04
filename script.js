@@ -5170,3 +5170,86 @@ window.tpLogoutTecnoplafonFinale = async function(){
     setTimeout(tpAddReloadCollButtonV60, 1600);
   });
 })();
+
+/* ===== V61 - blocco definitivo: collaboratore vede solo area operaio ===== */
+(function(){
+  function tpV61Norm(v){ return String(v || '').trim().toLowerCase(); }
+  function tpV61Role(){
+    try{
+      var p = window.supabaseProfiloCorrente || (typeof supabaseProfiloCorrente !== 'undefined' ? supabaseProfiloCorrente : null);
+      return tpV61Norm(p && p.ruolo);
+    }catch(e){ return ''; }
+  }
+  function tpV61IsAdmin(){
+    var r = tpV61Role();
+    var unlocked = false;
+    try{ unlocked = !!adminUnlocked || sessionStorage.getItem('tecnoplafonAdminUnlocked') === '1'; }catch(e){}
+    return unlocked || r === 'admin' || r === 'caposquadra' || r === 'amministratore';
+  }
+  function tpV61Logged(){
+    return document.body.classList.contains('tp-auth-ok') || document.body.classList.contains('tp-login-ok');
+  }
+  function tpV61CurrentVisibleAdminSection(){
+    var ids = ['admin','ore','raccoltaOperai','cantieri','lavorazioni','collaboratori','regole','calendari','economia'];
+    return ids.some(function(id){
+      var el = document.getElementById(id);
+      return el && !el.classList.contains('hidden') && getComputedStyle(el).display !== 'none';
+    });
+  }
+  function tpV61ForceWorker(){
+    if(!tpV61Logged() || tpV61IsAdmin()) return;
+    try{ adminUnlocked = false; sessionStorage.removeItem('tecnoplafonAdminUnlocked'); }catch(e){}
+    document.body.classList.add('worker-view');
+    document.body.classList.remove('admin-view');
+    var operaio = document.getElementById('operaio');
+    document.querySelectorAll('.section').forEach(function(s){
+      if(s.id === 'operaio') s.classList.remove('hidden');
+      else s.classList.add('hidden');
+    });
+    if(operaio) operaio.style.display = '';
+    var title = document.getElementById('pageTitle');
+    var subtitle = document.getElementById('pageSubtitle');
+    if(title) title.textContent = 'Area operaio';
+    if(subtitle) subtitle.textContent = 'Portale collaboratore: inserimento ore, richieste e riepilogo personale.';
+  }
+
+  var oldShow = window.showSection;
+  if(typeof oldShow === 'function' && !oldShow.__tpV61WorkerGuard){
+    window.showSection = function(id){
+      if(id !== 'operaio' && tpV61Logged() && !tpV61IsAdmin()){
+        id = 'operaio';
+      }
+      var out = oldShow.apply(this, arguments.length ? [id] : arguments);
+      setTimeout(tpV61ForceWorker, 0);
+      return out;
+    };
+    window.showSection.__tpV61WorkerGuard = true;
+  }
+
+  document.addEventListener('click', function(ev){
+    if(!tpV61Logged() || tpV61IsAdmin()) return;
+    var target = ev.target && ev.target.closest ? ev.target.closest('button,a') : null;
+    if(!target) return;
+    var txt = (target.textContent || '').toLowerCase();
+    var attr = (target.getAttribute('onclick') || '') + ' ' + (target.getAttribute('href') || '');
+    if(/cantieri|admin|raccolta|lavorazioni|collaboratori|regole|calendari|economia/.test(txt + ' ' + attr)){
+      ev.preventDefault();
+      ev.stopPropagation();
+      tpV61ForceWorker();
+      return false;
+    }
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(tpV61ForceWorker, 300);
+    setTimeout(tpV61ForceWorker, 1000);
+    setTimeout(tpV61ForceWorker, 2000);
+  });
+  window.addEventListener('load', function(){
+    setTimeout(tpV61ForceWorker, 300);
+    setTimeout(tpV61ForceWorker, 1500);
+  });
+  setInterval(function(){
+    if(tpV61CurrentVisibleAdminSection()) tpV61ForceWorker();
+  }, 700);
+})();
