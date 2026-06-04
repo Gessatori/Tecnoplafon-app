@@ -34,10 +34,12 @@
     const SUPABASE_ANON_KEY = "sb_publishable_TRDxM5otfvd2GxMTOFpc6g_Ogybejd5";
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     function showErr(msg){ const e=document.getElementById('loginError'); e.textContent=msg; e.style.display='block'; }
+    function hideErr(){ const e=document.getElementById('loginError'); e.textContent=''; e.style.display='none'; }
+    function cleanUser(v){ return String(v||'').trim(); }
     function normRole(r){ return String(r||'').trim().toLowerCase(); }
-    function isAdminRole(r){ r=normRole(r); return r==='admin' || r==='amministratore' || r==='caposquadra'; }
+    function isAdminRole(r){ r=normRole(r); return r==='admin' || r==='amministratore' || r==='caposquadra' || r.indexOf('capo')>=0; }
     async function login(){
-      const user = document.getElementById('loginEmail').value.trim();
+      const user = cleanUser(document.getElementById('loginEmail').value);
       const pass = document.getElementById('loginPassword').value;
       const btn = document.getElementById('loginBtn');
       if(!user || !pass){ showErr('Inserisci email/nome e password.'); return; }
@@ -45,13 +47,9 @@
       try{
         await sb.auth.signOut();
         let profile = null;
-        const userLow = user.toLowerCase();
-        // V67: accesso admin locale con la password storica dell'app.
-        // Evita il doppio login e non richiede Supabase Auth per l'admin.
-        if(String(pass) === 'TP2026' && (userLow.includes('info@tecnoplafon') || userLow === 'admin' || userLow.includes('tecnoplafon'))){
-          profile = {id:'local-admin', nome:'Admin Tecnoplafon', email:'info@tecnoplafon.ch', ruolo:'admin', stato:'Attivo', sorgente:'admin-locale'};
-        }
-        if(!profile && user.includes('@')){
+        // Sicurezza: nessuna password admin salvata nel file HTML.
+        // Gli admin devono entrare con Supabase Auth e ruolo admin/caposquadra in tabella profili.
+        if(user.includes('@')){
           const res = await sb.auth.signInWithPassword({email:user,password:pass});
           if(!res.error && res.data && res.data.user){
             const pr = await sb.from('profili').select('id,nome,email,ruolo,stato').eq('id',res.data.user.id).maybeSingle();
@@ -60,13 +58,23 @@
           }
         }
         if(!profile){
-          const cols = 'id,nome,email,ruolo,stato,password_app,max_ore_giorno';
+          const cols = 'id,nome,email,ruolo,stato,max_ore_giorno';
+          const safeUser = user.replace(/[%_]/g,'');
           let q = null;
-          if(user.includes('@')) q = await sb.from('collaboratori').select(cols).eq('email', user).maybeSingle();
-          if(!q || !q.data){ q = await sb.from('collaboratori').select(cols).ilike('nome', user).maybeSingle(); }
-          if(q.error && q.error.code !== 'PGRST116') throw q.error;
-          if(!q.data) throw new Error('Utente non trovato.');
-          if(String(q.data.password_app||'') !== String(pass||'')) throw new Error('Password collaboratore non corretta.');
+          if(user.includes('@')){
+            q = await sb.from('collaboratori').select(cols).ilike('email', user).eq('password_app', pass).maybeSingle();
+          }
+          if(!q || !q.data){
+            q = await sb.from('collaboratori').select(cols).ilike('nome', user).eq('password_app', pass).maybeSingle();
+          }
+          if(!q || !q.data){
+            const list = await sb.from('collaboratori').select(cols).or(`nome.ilike.%${safeUser}%,email.ilike.%${safeUser}%`).eq('password_app', pass).limit(2);
+            if(list.error) throw list.error;
+            if(list.data && list.data.length === 1) q = {data:list.data[0]};
+            else if(list.data && list.data.length > 1) throw new Error('Ho trovato piu collaboratori con questo nome. Inserisci email completa o nome completo.');
+          }
+          if(q && q.error && q.error.code !== 'PGRST116') throw q.error;
+          if(!q || !q.data) throw new Error('Utente non trovato o password collaboratore non corretta. Controlla Admin > Collaboratori.');
           profile = {...q.data, sorgente:'collaboratori'};
         }
         if(String(profile.stato||'Attivo').toLowerCase() !== 'attivo') throw new Error('Accesso bloccato: utente non attivo.');
@@ -82,5 +90,6 @@
       }catch(e){ showErr('Login fallito: ' + (e.message || e)); btn.disabled=false; }
     }
   </script>
+<!-- fix v68: nomi file canonici, login collaboratore piu robusto, routing admin/operaio corretto -->
 </body>
 </html>
