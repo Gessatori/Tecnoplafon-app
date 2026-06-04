@@ -16,7 +16,20 @@
   </style>
 </head>
 <body class="tp-auth-ok worker-view tp-worker-mode">
-<script>window.TP_PAGE_MODE="operaio";</script>
+<script>
+window.TP_PAGE_MODE="operaio";
+(function(){
+  function norm(r){return String(r||'').trim().toLowerCase();}
+  function isAdmin(r){r=norm(r); return r==='admin' || r==='amministratore' || r==='caposquadra' || r.indexOf('capo')>=0;}
+  try{
+    var raw = sessionStorage.getItem('tp_current_user_v66') || localStorage.getItem('tp_current_user_v66');
+    var p = raw ? JSON.parse(raw) : null;
+    if(!p){ window.location.replace('index.html'); return; }
+    if(isAdmin(p.ruolo)){ window.location.replace('admin.html'); return; }
+    sessionStorage.removeItem('tecnoplafonAdminUnlocked');
+  }catch(e){ window.location.replace('index.html'); }
+})();
+</script>
 <button id="tpLogoutBtn" type="button" onclick="tpLogoutTecnoplafonFinale()">🚪 Logout</button>
 <div class="app">
   <main>
@@ -145,7 +158,7 @@
             <div class="f6"><label>Tipo richiesta</label><select><option>Vacanze</option><option>Ore libere</option><option>Permesso</option><option>Recupero ore</option></select></div>
             <div class="f6"><label>Periodo</label><input type="text" placeholder="es. 15.07 - 19.07"></div>
             <div class="f12"><label>Motivo / note</label><textarea></textarea></div>
-            <div class="f12"><button class="primary" onclick="demoSave()">Invia richiesta</button></div>
+            <div class="f12"><button class="primary" onclick="tpInviaRichiestaEmailOperaio()">Invia email richiesta</button></div>
           </div>
         </div>
 
@@ -250,7 +263,7 @@
       </div>
       <div class="iphone-actions">
         <button class="secondary" onclick="closeWorkerWindow()">Annulla</button>
-        <button class="primary" onclick="demoSave(); closeWorkerWindow();">Invia richiesta</button>
+        <button class="primary" onclick="tpInviaRichiestaEmailOperaio()">Invia email</button>
       </div>
     </div>
 
