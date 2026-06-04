@@ -4973,3 +4973,28 @@ body.tp-auth-ok #adminAccessBtn{
     font-size:13px;
     line-height:1.4;
   }
+
+/* ===== V61 - sicurezza vista collaboratore: nessuna gestione cantieri/admin visibile ===== */
+body.tp-auth-ok:not(.admin-view) aside,
+body.tp-auth-ok:not(.admin-view) nav .admin-only-nav,
+body.tp-auth-ok:not(.admin-view) .role-switch,
+body.tp-auth-ok:not(.admin-view) #adminLogoutBtn,
+body.tp-auth-ok:not(.admin-view) #adminFloatingBtn,
+body.tp-auth-ok:not(.admin-view) #adminAccessBtn,
+body.tp-auth-ok:not(.admin-view) #admin,
+body.tp-auth-ok:not(.admin-view) #ore,
+body.tp-auth-ok:not(.admin-view) #raccoltaOperai,
+body.tp-auth-ok:not(.admin-view) #cantieri,
+body.tp-auth-ok:not(.admin-view) #lavorazioni,
+body.tp-auth-ok:not(.admin-view) #collaboratori,
+body.tp-auth-ok:not(.admin-view) #regole,
+body.tp-auth-ok:not(.admin-view) #calendari,
+body.tp-auth-ok:not(.admin-view) #economia,
+body.tp-auth-ok:not(.admin-view) .admin-economic-only{
+  display:none!important;
+}
+body.tp-auth-ok:not(.admin-view) main{width:100%;padding:18px!important;}
+body.tp-auth-ok:not(.admin-view) .section:not(#operaio){display:none!important;}
+body.tp-auth-ok:not(.admin-view) #operaio{display:block!important;}
+body.tp-auth-ok:not(.admin-view) #operaio .grid > .card:not(:first-child){display:none!important;}
+body.tp-auth-ok:not(.admin-view) .worker-only-card{display:block!important;}
