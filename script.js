@@ -5085,3 +5085,88 @@ window.tpLogoutTecnoplafonFinale = async function(){
   });
 })();
 
+
+/* ===== v60 - Caricamento collaboratori Supabase sempre attivo online ===== */
+(function(){
+  function tpSbV60(){ return window.supabaseClient || (typeof supabaseClient !== "undefined" ? supabaseClient : null); }
+  function tpTrimV60(v){ return String(v == null ? "" : v).trim(); }
+  function tpNormCollV60(row){
+    row = row || {};
+    return {
+      id: row.id || "",
+      nome: row.nome || "",
+      email: row.email || "",
+      ruolo: row.ruolo || "Operaio",
+      stato: row.stato || "Attivo",
+      password: row.password_app || row.password || "",
+      maxOre: Number(row.max_ore_giorno || row.maxOre || 10)
+    };
+  }
+  function tpRefreshCollUiV60(){
+    try{ if(typeof adminSave === "function") adminSave(); }catch(e){}
+    try{ if(typeof renderAdminData === "function") renderAdminData(); }catch(e){}
+    try{ if(typeof fillAdminMonthSelects === "function") fillAdminMonthSelects(); }catch(e){}
+    try{ if(typeof popolaRaccoltaOperaiSelect === "function") popolaRaccoltaOperaiSelect(); }catch(e){}
+    try{ if(typeof renderRaccoltaOperai === "function") renderRaccoltaOperai(); }catch(e){}
+    try{ if(typeof renderAdminPresenzeOggi === "function") renderAdminPresenzeOggi(); }catch(e){}
+  }
+  async function tpCaricaCollaboratoriSempreV60(showAlert){
+    var sb = tpSbV60();
+    if(!sb){ if(showAlert) alert("Supabase non collegato."); return []; }
+    var res = await sb
+      .from("collaboratori")
+      .select("id,nome,email,ruolo,stato,password_app,max_ore_giorno")
+      .order("nome", {ascending:true});
+    if(res.error){
+      console.error("Errore caricamento collaboratori V60:", res.error);
+      if(showAlert) alert("Errore caricamento collaboratori Supabase: " + (res.error.message || res.error));
+      return [];
+    }
+    var lista = (res.data || []).map(tpNormCollV60).filter(function(x){ return tpTrimV60(x.nome); });
+    try{
+      window.adminData = window.adminData || {};
+      window.adminData.operai = lista;
+      if(typeof adminData !== "undefined" && adminData) adminData.operai = lista;
+    }catch(e){ console.warn("Impossibile impostare adminData.operai V60", e); }
+    tpRefreshCollUiV60();
+    if(showAlert) alert("Collaboratori caricati da Supabase: " + lista.length);
+    return lista;
+  }
+  window.caricaCollaboratoriDaSupabase = tpCaricaCollaboratoriSempreV60;
+  window.tpCaricaCollaboratoriSupabaseCompleto = tpCaricaCollaboratoriSempreV60;
+  window.tpRicaricaCollaboratoriSupabaseV60 = function(){ return tpCaricaCollaboratoriSempreV60(true); };
+
+  function tpAddReloadCollButtonV60(){
+    if(document.getElementById("tpReloadCollaboratoriSupabaseBtn")) return;
+    var card = document.querySelector("#collaboratori .card.span-4 .form-grid") || document.querySelector("#collaboratori .form-grid");
+    if(!card) return;
+    var div = document.createElement("div");
+    div.className = "f12";
+    div.innerHTML = '<button id="tpReloadCollaboratoriSupabaseBtn" class="secondary" type="button" onclick="tpRicaricaCollaboratoriSupabaseV60()">Ricarica collaboratori da Supabase</button><p class="mini-note">Usalo se online vedi ancora una lista vecchia.</p>';
+    card.appendChild(div);
+  }
+
+  var oldShowSectionV60 = window.showSection;
+  if(typeof oldShowSectionV60 === "function" && !oldShowSectionV60.__tpV60Coll){
+    var patchedShowV60 = function(id){
+      var out = oldShowSectionV60.apply(this, arguments);
+      if(["admin","collaboratori","raccoltaOperai","ore"].indexOf(id) >= 0){
+        setTimeout(function(){ tpCaricaCollaboratoriSempreV60(false); }, 250);
+        setTimeout(tpAddReloadCollButtonV60, 500);
+      }
+      return out;
+    };
+    patchedShowV60.__tpV60Coll = true;
+    window.showSection = patchedShowV60;
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    setTimeout(function(){ tpCaricaCollaboratoriSempreV60(false); }, 800);
+    setTimeout(tpAddReloadCollButtonV60, 1200);
+  });
+  window.addEventListener("load", function(){
+    setTimeout(function(){ tpCaricaCollaboratoriSempreV60(false); }, 1200);
+    setTimeout(function(){ tpCaricaCollaboratoriSempreV60(false); }, 3000);
+    setTimeout(tpAddReloadCollButtonV60, 1600);
+  });
+})();
