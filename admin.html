@@ -9,33 +9,22 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body class="tp-auth-ok admin-view">
-<script>window.TP_PAGE_MODE="admin";</script>
+<script>
+window.TP_PAGE_MODE="admin";
+(function(){
+  function norm(r){return String(r||'').trim().toLowerCase();}
+  function isAdmin(r){r=norm(r); return r==='admin' || r==='amministratore' || r==='caposquadra' || r.indexOf('capo')>=0;}
+  try{
+    var raw = sessionStorage.getItem('tp_current_user_v66') || localStorage.getItem('tp_current_user_v66');
+    var p = raw ? JSON.parse(raw) : null;
+    if(!p){ window.location.replace('index.html'); return; }
+    if(!isAdmin(p.ruolo)){ window.location.replace('operaio.html'); return; }
+    sessionStorage.setItem('tecnoplafonAdminUnlocked','1');
+  }catch(e){ window.location.replace('index.html'); }
+})();
+</script>
 
 <button id="tpLogoutBtn" type="button" onclick="tpLogoutTecnoplafonFinale()">🚪 Logout</button>
-
-<div id="tpFullLogin">
-  <div class="tp-full-login-card">
-    <div class="tp-full-login-logo">
-      <img src="https://tecnoplafon.ch/wp-content/uploads/2019/08/TECNOPLAFON-logo_v01.png" alt="Tecnoplafon">
-    </div>
-    <h1>Gestione Ore</h1>
-    <p>Accedi con email e password Supabase.</p>
-
-    <label>Email</label>
-    <input id="tpFullEmail" type="email" value="info@tecnoplafon.ch" autocomplete="username">
-
-    <label>Password</label>
-    <input id="tpFullPassword" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter'){tpFullLoginSubmit()}">
-
-    <div id="tpFullLoginError"></div>
-
-    <button id="tpFullLoginBtn" onclick="tpFullLoginSubmit()">Entra</button>
-
-    <small>Admin e collaboratori usano lo stesso accesso. Il ruolo viene letto da Supabase.</small>
-  </div>
-</div>
-
-<button id="adminFloatingBtn" type="button" class="admin-floating-access" onclick="event.preventDefault(); event.stopPropagation(); openAdminAccess(); return false;">🔐 Accesso admin</button>
 
 <div class="app">
   <aside>
@@ -69,9 +58,7 @@
         <h2 id="pageTitle">Area operaio</h2>
         <p id="pageSubtitle">Portale collaboratore: inserimento ore, richieste e riepilogo personale.</p>
       </div>
-      <div class="header-actions">
-        <button id="adminAccessBtn" type="button" class="admin-login-btn" onclick="event.preventDefault(); event.stopPropagation(); openAdminAccess(); return false;">🔐 Accesso admin</button>
-        <button id="adminLogoutBtn" class="admin-logout-btn" onclick="logoutAdmin()">👷 Torna vista operaio</button>
+      <div class="header-actions">        <button id="adminLogoutBtn" class="admin-logout-btn" onclick="tpLogoutTecnoplafonFinale()">🚪 Logout</button>
         <div class="role-switch">
           <button class="active" onclick="showSection('operaio')">Operaio</button>
           <button onclick="showSection('admin')">Admin</button>
@@ -1053,20 +1040,6 @@
         <span><i class="status-dot" style="background:var(--blue)"></i> Vacanza</span>
         <span><i class="status-dot" style="background:var(--gray)"></i> Non lavorativo</span>
       </div>
-    </div>
-  </div>
-</div>
-
-<div id="adminAccessPanel" class="admin-access-panel" onclick="closeAdminAccess(event)">
-  <div class="admin-access-box" onclick="event.stopPropagation()">
-    <h3>🔐 Accesso admin</h3>
-    <p>Inserisci la password admin per aprire il pannello completo.</p>
-    <label>Password admin</label>
-    <input id="adminAccessPassword" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter'){adminLoginSubmit()}">
-    <div id="adminAccessError" class="admin-access-error">Password admin non corretta.</div>
-    <div class="admin-access-actions">
-      <button class="secondary" onclick="closeAdminAccess()">Annulla</button>
-      <button class="primary" onclick="adminLoginSubmit()">Entra admin</button>
     </div>
   </div>
 </div>
