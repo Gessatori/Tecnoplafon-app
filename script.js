@@ -5253,3 +5253,106 @@ window.tpLogoutTecnoplafonFinale = async function(){
     if(tpV61CurrentVisibleAdminSection()) tpV61ForceWorker();
   }, 700);
 })();
+
+/* ===== V62 - sicurezza forte: sessione collaboratore senza area admin/economia ===== */
+(function(){
+  function norm(v){ return String(v || '').trim().toLowerCase(); }
+  function role(){
+    try{
+      var p = window.supabaseProfiloCorrente || (typeof supabaseProfiloCorrente !== 'undefined' ? supabaseProfiloCorrente : null);
+      return norm(p && p.ruolo);
+    }catch(e){ return ''; }
+  }
+  function isAdminRole(r){
+    r = norm(r);
+    return r === 'admin' || r === 'amministratore' || r === 'caposquadra' || r.indexOf('capo') >= 0;
+  }
+  function isWorkerSession(){
+    var r = role();
+    if(document.body.classList.contains('tp-worker-mode')) return true;
+    if(r && !isAdminRole(r)) return true;
+    return false;
+  }
+  function setWorkerMode(){
+    try{ adminUnlocked = false; sessionStorage.removeItem('tecnoplafonAdminUnlocked'); }catch(e){}
+    document.body.classList.add('tp-auth-ok','tp-worker-mode','worker-view');
+    document.body.classList.remove('tp-admin-mode','admin-view');
+    document.querySelectorAll('.section').forEach(function(s){
+      if(s.id === 'operaio'){
+        s.classList.remove('hidden');
+        s.style.display = '';
+      }else{
+        s.classList.add('hidden');
+        s.style.display = 'none';
+      }
+    });
+    document.querySelectorAll('nav .admin-only-nav, .role-switch, #adminFloatingBtn, #adminAccessBtn, #adminLogoutBtn, .admin-economic-only').forEach(function(el){
+      el.style.display = 'none';
+    });
+    var title = document.getElementById('pageTitle');
+    var subtitle = document.getElementById('pageSubtitle');
+    if(title) title.textContent = 'Area operaio';
+    if(subtitle) subtitle.textContent = 'Portale collaboratore: inserimento ore, richieste e riepilogo personale.';
+  }
+  function setAdminMode(){
+    document.body.classList.add('tp-admin-mode','admin-view');
+    document.body.classList.remove('tp-worker-mode','worker-view');
+  }
+  function applyModeFromProfile(){
+    var r = role();
+    if(!document.body.classList.contains('tp-auth-ok')) return;
+    if(isAdminRole(r)) setAdminMode();
+    else if(r || document.body.classList.contains('tp-worker-mode')) setWorkerMode();
+  }
+
+  var oldShow = window.showSection;
+  if(typeof oldShow === 'function' && !oldShow.__tpV62HardWorkerGuard){
+    window.showSection = function(id){
+      if(isWorkerSession() && id !== 'operaio'){
+        setWorkerMode();
+        return false;
+      }
+      var res = oldShow.apply(this, arguments);
+      setTimeout(applyModeFromProfile, 0);
+      return res;
+    };
+    window.showSection.__tpV62HardWorkerGuard = true;
+  }
+
+  var oldLogin = window.tpFullLoginSubmit;
+  if(typeof oldLogin === 'function' && !oldLogin.__tpV62ModePatch){
+    window.tpFullLoginSubmit = async function(){
+      var res = await oldLogin.apply(this, arguments);
+      setTimeout(applyModeFromProfile, 0);
+      setTimeout(applyModeFromProfile, 300);
+      setTimeout(applyModeFromProfile, 1200);
+      return res;
+    };
+    window.tpFullLoginSubmit.__tpV62ModePatch = true;
+  }
+
+  document.addEventListener('click', function(ev){
+    if(!isWorkerSession()) return;
+    var t = ev.target && ev.target.closest ? ev.target.closest('button,a,[onclick]') : null;
+    if(!t) return;
+    var content = norm((t.textContent || '') + ' ' + (t.getAttribute('onclick') || '') + ' ' + (t.getAttribute('href') || ''));
+    if(/admin|cantieri|cantiere|economia|raccolta|collaboratori|lavorazioni|regole|calendari|materiali|andamento/.test(content)){
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      setWorkerMode();
+      return false;
+    }
+  }, true);
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(applyModeFromProfile, 250);
+    setTimeout(applyModeFromProfile, 1000);
+  });
+  window.addEventListener('load', function(){
+    setTimeout(applyModeFromProfile, 300);
+    setTimeout(applyModeFromProfile, 1500);
+  });
+  setInterval(function(){
+    if(isWorkerSession()) setWorkerMode();
+  }, 500);
+})();
