@@ -4750,7 +4750,21 @@
 
   </style>
 </head>
-<body class="worker-view">
+<body class="admin-view">
+<script>
+window.TP_PAGE_MODE="admin";
+(function(){
+  function norm(r){return String(r||'').trim().toLowerCase();}
+  function isAdmin(r){r=norm(r); return r==='admin' || r==='amministratore' || r==='caposquadra' || r.indexOf('capo')>=0;}
+  try{
+    var raw = sessionStorage.getItem('tp_current_user_v66') || localStorage.getItem('tp_current_user_v66');
+    var p = raw ? JSON.parse(raw) : null;
+    if(!p || !isAdmin(p.ruolo)){ window.location.replace('index.html'); return; }
+    sessionStorage.setItem('tecnoplafonAdminUnlocked','1');
+  }catch(e){ window.location.replace('index.html'); }
+})();
+</script>
+
 <button id="adminFloatingBtn" type="button" class="admin-floating-access" onclick="event.preventDefault(); event.stopPropagation(); openAdminAccess(); return false;">🔐 Login admin</button>
 
 <div class="app">
@@ -5748,7 +5762,9 @@
   function logoutAdmin(){
     adminUnlocked = false;
     sessionStorage.removeItem("tecnoplafonAdminUnlocked");
-    showSection('operaio');
+    sessionStorage.removeItem('tp_current_user_v66');
+    localStorage.removeItem('tp_current_user_v66');
+    window.location.href = 'index.html';
   }
 
   function showSection(id){
@@ -5838,6 +5854,11 @@
     popolaRaccoltaOperaiSelect();
     renderRaccoltaOperai();
     initAdminMonthPanel();
+    if(adminUnlocked){
+      showSection('admin');
+    }else{
+      window.location.replace('index.html');
+    }
   });
 
   const ECON_TIPI = [
@@ -8287,6 +8308,7 @@
 
 
 <!-- v41: Fix modifica dopo login admin - il pulsante Modifica memorizza la riga, apre login se serve e poi carica davvero ore, cantiere, lavorazione e tipologia del lavoro. -->
+<!-- fix v68: admin apre direttamente Area admin e non Area operaio -->
 </body>
 </html>
 
