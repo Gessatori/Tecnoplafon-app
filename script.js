@@ -5356,3 +5356,140 @@ window.tpLogoutTecnoplafonFinale = async function(){
     if(isWorkerSession()) setWorkerMode();
   }, 500);
 })();
+
+
+/* ===== V64 - vista collaboratore pulita senza overlay: bottoni funzionanti ===== */
+(function(){
+  function norm(v){ return String(v == null ? '' : v).trim().toLowerCase(); }
+  function currentRole(){
+    try{
+      var p = window.supabaseProfiloCorrente || (typeof supabaseProfiloCorrente !== 'undefined' ? supabaseProfiloCorrente : null);
+      return norm(p && p.ruolo);
+    }catch(e){ return ''; }
+  }
+  function isAdminRole(r){
+    r = norm(r);
+    return r === 'admin' || r === 'amministratore' || r === 'caposquadra' || r.indexOf('capo') >= 0;
+  }
+  function isLogged(){ return document.body.classList.contains('tp-auth-ok'); }
+  function isWorkerMode(){
+    if(!isLogged()) return false;
+    if(document.body.classList.contains('tp-admin-mode') || document.body.classList.contains('admin-view')){
+      var r = currentRole();
+      return !!r && !isAdminRole(r);
+    }
+    var role = currentRole();
+    return document.body.classList.contains('tp-worker-clean') || document.body.classList.contains('tp-worker-mode') || (!!role && !isAdminRole(role));
+  }
+  function addStyle(){
+    if(document.getElementById('tpWorkerCleanV64Style')) return;
+    var st=document.createElement('style');
+    st.id='tpWorkerCleanV64Style';
+    st.textContent = `
+      body.tp-worker-clean{background:#eef4ff!important;overflow:auto!important;}
+      body.tp-worker-clean .app{filter:none!important;pointer-events:auto!important;user-select:auto!important;display:block!important;}
+      body.tp-worker-clean aside,
+      body.tp-worker-clean nav,
+      body.tp-worker-clean .role-switch,
+      body.tp-worker-clean #adminFloatingBtn,
+      body.tp-worker-clean #adminAccessBtn,
+      body.tp-worker-clean #adminLogoutBtn,
+      body.tp-worker-clean .admin-login-btn,
+      body.tp-worker-clean .admin-logout-btn,
+      body.tp-worker-clean #admin,
+      body.tp-worker-clean #ore,
+      body.tp-worker-clean #raccoltaOperai,
+      body.tp-worker-clean #cantieri,
+      body.tp-worker-clean #lavorazioni,
+      body.tp-worker-clean #collaboratori,
+      body.tp-worker-clean #regole,
+      body.tp-worker-clean #calendari,
+      body.tp-worker-clean #economia,
+      body.tp-worker-clean .admin-economic-only,
+      body.tp-worker-clean .linked-hours-panel,
+      body.tp-worker-clean .action-open-panel{
+        display:none!important;
+        visibility:hidden!important;
+        height:0!important;
+        overflow:hidden!important;
+      }
+      body.tp-worker-clean main{width:100%!important;max-width:1100px!important;margin:0 auto!important;padding:18px!important;display:block!important;overflow:visible!important;}
+      body.tp-worker-clean header{display:block!important;margin-bottom:18px!important;}
+      body.tp-worker-clean header h2::after{content:' - Collaboratore';}
+      body.tp-worker-clean #operaio{display:block!important;visibility:visible!important;height:auto!important;overflow:visible!important;}
+      body.tp-worker-clean .section:not(#operaio){display:none!important;visibility:hidden!important;height:0!important;overflow:hidden!important;}
+      body.tp-worker-clean #operaio .grid{display:block!important;}
+      body.tp-worker-clean #operaio .grid > .card:not(:first-child){display:none!important;}
+      body.tp-worker-clean #operaio .card:first-child{display:block!important;visibility:visible!important;height:auto!important;overflow:visible!important;}
+      body.tp-worker-clean #operaio .quick{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important;}
+      body.tp-worker-clean #operaio .big-btn{display:block!important;visibility:visible!important;pointer-events:auto!important;min-height:150px!important;}
+      body.tp-worker-clean #mobilePanel,
+      body.tp-worker-clean .mobile-action-panel{display:none;visibility:visible!important;height:auto!important;z-index:2147483000!important;}
+      body.tp-worker-clean #mobilePanel.open,
+      body.tp-worker-clean .mobile-action-panel.open{display:flex!important;}
+      body.tp-worker-clean #tpWorkerPortalV63{display:none!important;}
+      body.tp-worker-clean.tp-worker-portal-v63 #tpWorkerPortalV63{display:none!important;}
+      @media(max-width:760px){body.tp-worker-clean #operaio .quick{grid-template-columns:1fr!important;} body.tp-worker-clean main{padding:12px!important;padding-bottom:18px!important;}}
+    `;
+    document.head.appendChild(st);
+  }
+  function cleanWorkerView(){
+    if(!isWorkerMode()) return;
+    addStyle();
+    try{ adminUnlocked=false; sessionStorage.removeItem('tecnoplafonAdminUnlocked'); }catch(e){}
+    document.body.classList.add('tp-worker-clean','tp-worker-mode','worker-view','tp-auth-ok');
+    document.body.classList.remove('admin-view','tp-admin-mode','tp-worker-portal-v63');
+    var portal=document.getElementById('tpWorkerPortalV63');
+    if(portal) portal.remove();
+    document.querySelectorAll('.section').forEach(function(sec){
+      if(sec.id === 'operaio'){
+        sec.classList.remove('hidden');
+        sec.style.display='block';
+        sec.style.visibility='visible';
+        sec.style.height='auto';
+      }else{
+        sec.classList.add('hidden');
+        sec.style.display='none';
+        sec.style.visibility='hidden';
+        sec.style.height='0';
+      }
+    });
+    var title=document.getElementById('pageTitle');
+    if(title) title.textContent='Area operaio';
+    var sub=document.getElementById('pageSubtitle');
+    if(sub) sub.textContent='Segna ore, vacanze e riepilogo personale.';
+  }
+  var oldShow=window.showSection;
+  if(typeof oldShow === 'function' && !oldShow.__tpV64CleanPatch){
+    window.showSection=function(id){
+      if(isWorkerMode() && id !== 'operaio'){
+        cleanWorkerView();
+        return false;
+      }
+      var out=oldShow.apply(this, arguments);
+      setTimeout(cleanWorkerView, 0);
+      return out;
+    };
+    window.showSection.__tpV64CleanPatch=true;
+  }
+  var oldLogin=window.tpFullLoginSubmit;
+  if(typeof oldLogin === 'function' && !oldLogin.__tpV64CleanPatch){
+    window.tpFullLoginSubmit=async function(){
+      var out=await oldLogin.apply(this, arguments);
+      setTimeout(cleanWorkerView, 0);
+      setTimeout(cleanWorkerView, 300);
+      setTimeout(cleanWorkerView, 1200);
+      return out;
+    };
+    window.tpFullLoginSubmit.__tpV64CleanPatch=true;
+  }
+  document.addEventListener('click', function(e){
+    if(!isWorkerMode()) return;
+    var adminTarget=e.target && e.target.closest && e.target.closest('#admin,#ore,#raccoltaOperai,#cantieri,#lavorazioni,#collaboratori,#regole,#calendari,#economia,aside,nav,.admin-economic-only,.action-open-panel');
+    if(adminTarget){ e.preventDefault(); e.stopPropagation(); cleanWorkerView(); return false; }
+  }, true);
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(cleanWorkerView, 200); setTimeout(cleanWorkerView, 1000); });
+  window.addEventListener('load', function(){ setTimeout(cleanWorkerView, 200); setTimeout(cleanWorkerView, 1200); });
+  // Controllo leggero: non blocca i bottoni, mantiene solo la pagina pulita.
+  setInterval(function(){ if(isWorkerMode()) cleanWorkerView(); }, 1500);
+})();
