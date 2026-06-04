@@ -4998,3 +4998,36 @@ body.tp-auth-ok:not(.admin-view) .section:not(#operaio){display:none!important;}
 body.tp-auth-ok:not(.admin-view) #operaio{display:block!important;}
 body.tp-auth-ok:not(.admin-view) #operaio .grid > .card:not(:first-child){display:none!important;}
 body.tp-auth-ok:not(.admin-view) .worker-only-card{display:block!important;}
+
+/* ===== V62 - blocco visivo definitivo collaboratore ===== */
+body.tp-worker-mode aside,
+body.tp-worker-mode nav .admin-only-nav,
+body.tp-worker-mode .role-switch,
+body.tp-worker-mode #adminFloatingBtn,
+body.tp-worker-mode #adminAccessBtn,
+body.tp-worker-mode #adminLogoutBtn,
+body.tp-worker-mode #admin,
+body.tp-worker-mode #ore,
+body.tp-worker-mode #raccoltaOperai,
+body.tp-worker-mode #cantieri,
+body.tp-worker-mode #lavorazioni,
+body.tp-worker-mode #collaboratori,
+body.tp-worker-mode #regole,
+body.tp-worker-mode #calendari,
+body.tp-worker-mode #economia,
+body.tp-worker-mode .admin-economic-only,
+body.tp-worker-mode .linked-hours-panel,
+body.tp-worker-mode .action-open-panel,
+body.tp-worker-mode [onclick*="admin"],
+body.tp-worker-mode [onclick*="cantieri"],
+body.tp-worker-mode [onclick*="economia"],
+body.tp-worker-mode [onclick*="raccolta"],
+body.tp-worker-mode [onclick*="lavorazioni"],
+body.tp-worker-mode [onclick*="collaboratori"]{
+  display:none!important;
+}
+body.tp-worker-mode main{width:100%!important;padding:18px!important;}
+body.tp-worker-mode .section:not(#operaio){display:none!important;}
+body.tp-worker-mode #operaio{display:block!important;}
+body.tp-worker-mode #operaio .grid > .card:not(:first-child){display:none!important;}
+body.tp-worker-mode .worker-only-card{display:block!important;}
