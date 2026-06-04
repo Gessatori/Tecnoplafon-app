@@ -4869,7 +4869,7 @@ body.tp-auth-ok #adminAccessBtn{
 /* ===== Blocco CSS estratto dal file originale ===== */
 
 .tp-email-richiesta-btn{
-    display:none!important;
+    display:inline-flex!important;
   }
 
 /* ===== Blocco CSS estratto dal file originale ===== */
@@ -5031,3 +5031,8 @@ body.tp-worker-mode .section:not(#operaio){display:none!important;}
 body.tp-worker-mode #operaio{display:block!important;}
 body.tp-worker-mode #operaio .grid > .card:not(:first-child){display:none!important;}
 body.tp-worker-mode .worker-only-card{display:block!important;}
+
+
+/* V67 - Fix admin/accesso e email collaboratore */
+body.admin-view #tpFullLogin, body.admin-view #adminAccessPanel, body.admin-view #adminFloatingBtn, body.admin-view #adminAccessBtn{display:none!important;}
+body.worker-view .tp-email-richiesta-btn{display:inline-flex!important;}
