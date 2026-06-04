@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tecnoplafon - Portale Collaboratore</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body.tp-auth-ok.worker-view{background:linear-gradient(180deg,#f8fbff 0%,#eef4ff 42%,#f7f9fc 100%)!important;}
+    body.tp-auth-ok .app{display:block!important;min-height:100vh!important;}
+    aside,.role-switch,.admin-only-nav,#adminFloatingBtn,#adminAccessBtn,#adminLogoutBtn{display:none!important;}
+    main{max-width:1180px;margin:0 auto;padding:28px 18px 42px!important;}
+    header{border:0;box-shadow:0 22px 54px rgba(15,23,42,.10);background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 58%,#2563eb 100%);color:white;padding:28px;border-radius:28px;margin-bottom:22px;}
+    header h2{color:white} header p{color:#dbeafe}
+    #tpLogoutBtn{display:inline-flex!important}
+  </style>
+</head>
+<body class="tp-auth-ok worker-view tp-worker-mode">
+<script>window.TP_PAGE_MODE="operaio";</script>
+<button id="tpLogoutBtn" type="button" onclick="tpLogoutTecnoplafonFinale()">🚪 Logout</button>
+<div class="app">
+  <main>
+    <header>
+      <div>
+        <h2 id="pageTitle">Area operaio</h2>
+        <p id="pageSubtitle">Portale collaboratore: inserimento ore, richieste e riepilogo personale.</p>
+      </div>
+    </header>
+    <section id="operaio" class="section">
+      <div class="grid">
+        <div class="card span-12">
+          <h3>Portale collaboratore</h3>
+          <div class="quick">
+            <button class="big-btn" onclick="openWorkerWindow('ore')">
+              <b>⏱️ Ore</b>
+              <span>Inserimento ore del giorno corrente con cantiere, ID + categoria, lavorazione, pausa e note.</span>
+            </button>
+            <button class="big-btn" onclick="openWorkerWindow('vacanze')">
+              <b>🌴 Vacanze / ore libere</b>
+              <span>Richiesta vacanze, permessi, recuperi o ore libere con approvazione admin.</span>
+            </button>
+            <button class="big-btn" onclick="openWorkerWindow('calendario')">
+              <b>📋 Riepilogo</b>
+              <span>Riepilogo personale mensile con ore, ferie, giorni liberi e richieste. Nessun dato economico.</span>
+            </button>
+          </div>
+          <div class="mobile-helper">
+            Su iPhone, quando il collaboratore clicca un bottone, si apre subito una finestra dedicata con i campi in fila e pulsanti grandi.
+          </div>
+          <div class="alert worker-only-card" style="margin-top:14px">
+            Vista collaboratore pulita e sicura: disponibili solo Ore, Vacanze / ore libere e Riepilogo personale. Tutte le informazioni economiche restano solo lato admin.
+          </div>
+        </div>
+
+        <div id="formOre" class="card span-7">
+          <h3>Inserimento ore operaio</h3>
+          <div class="alert">
+            Regole finali pubblicazione: le ore da segnare sono dettate dalle regole admin. L’admin imposta il totale ore giornaliero previsto per orario invernale/estivo, i limiti di data, festivi e vacanze bloccate. La trasferta non è presente lato operaio.
+          </div>
+          <br>
+          <div class="form-grid">
+            <div class="f6">
+              <label>Data</label>
+              <input id="dataOre" type="date">
+            </div>
+            <div class="f6">
+              <label>Cantiere</label>
+              <select id="operaioCantiereSelect" onchange="syncEconomicPreview()">
+                <option>Lugano Centro - attivo</option>
+                <option>Paradiso Residenza - attivo</option>
+                <option>Viganello Appartamenti - attivo</option>
+              </select>
+            </div>
+            <div class="f12">
+              <label>ID + Categoria in unica finestra</label>
+              <select id="categoriaSelect" onchange="aggiornaLavorazioni()">
+                <option value="100">100 — Cartongesso</option>
+                <option value="200">200 — Rasatura / Intonaco</option>
+                <option value="300">300 — Isolamento</option>
+                <option value="400">400 — Pittura</option>
+                <option value="500">500 — Preparazione cantiere</option>
+                <option value="600">600 — Extra / Regia</option>
+              </select>
+            </div>
+            <div class="f12">
+              <label>Lavorazione specifica collegata</label>
+              <select id="lavorazioneSelect"></select>
+            </div>
+            <div class="f3">
+              <label>Dalle</label>
+              <input id="oraDaDesktop" type="time" value="07:00" onchange="calcolaOreDesktop()">
+            </div>
+            <div class="f3">
+              <label>Alle</label>
+              <input id="oraADesktop" type="time" value="16:00" onchange="calcolaOreDesktop()">
+            </div>
+            <div class="f3">
+              <label>Pausa</label>
+              <input id="pausaDesktop" type="number" min="0" step="0.25" value="0.5" onchange="calcolaOreDesktop()">
+            </div>
+            <div class="f3">
+              <label>Ore</label>
+              <input id="oreDesktop" type="number" min="0" max="12" step="0.25" value="8">
+            </div>
+            <div class="f12">
+              <label>Stato</label>
+              <select>
+                <option>Da approvare</option>
+                <option>Bozza</option>
+              </select>
+            </div>
+            <div class="f12">
+              <label>Note</label>
+              <textarea placeholder="Descrizione breve del lavoro svolto"></textarea>
+            </div>
+            <div class="f12">
+              <button class="primary" onclick="salvaOreCollegate()">Invia ore e collega al cantiere</button>
+              <button class="secondary" onclick="demoSave()">Salva bozza</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card span-5">
+          <h3>Controlli automatici</h3>
+          <div class="rule-list">
+            <div class="rule"><b>Regole admin</b><small>Le ore da segnare seguono il totale giornaliero impostato dall’admin per orario invernale o estivo.</small></div>
+            <div class="rule"><b>Festivi / vacanze</b><small>Giorni festivi e vacanze assegnate sono bloccati: nessun inserimento ore.</small></div>
+            <div class="rule"><b>Max ore</b><small>Massimo giornaliero deciso dall’admin.</small></div>
+            <div class="rule"><b>ID + Categoria</b><small>Scelta obbligatoria in una sola finestra.</small></div>
+            <div class="rule"><b>Trasferta</b><small>Non visibile e non modificabile dall’operaio.</small></div>
+          </div>
+          <h3 style="margin-top:18px">Tabella operaio senza trasferta</h3>
+          <table>
+            <thead><tr><th>Data</th><th>Cantiere</th><th>ID + categoria</th><th>Ore</th></tr></thead>
+            <tbody>
+              <tr><td>Oggi</td><td>Lugano Centro</td><td>100 — Cartongesso</td><td>8</td></tr>
+              <tr><td>Oggi</td><td>Paradiso</td><td>200 — Rasatura</td><td>2</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="formVacanze" class="card span-5">
+          <h3>Richiesta vacanze / ore libere</h3>
+          <div class="form-grid">
+            <div class="f6"><label>Tipo richiesta</label><select><option>Vacanze</option><option>Ore libere</option><option>Permesso</option><option>Recupero ore</option></select></div>
+            <div class="f6"><label>Periodo</label><input type="text" placeholder="es. 15.07 - 19.07"></div>
+            <div class="f12"><label>Motivo / note</label><textarea></textarea></div>
+            <div class="f12"><button class="primary" onclick="demoSave()">Invia richiesta</button></div>
+          </div>
+        </div>
+
+        <div id="calOperaio" class="card span-7">
+          <h3>Riepilogo personale mensile</h3>
+          <div class="calendar" id="calendarOperaio"></div>
+          <div class="legend">
+            <span><i class="status-dot dot-green"></i> Ore approvate</span>
+            <span><i class="status-dot" style="background:var(--yellow)"></i> Da controllare</span>
+            <span><i class="status-dot" style="background:var(--blue)"></i> Vacanza</span>
+            <span><i class="status-dot" style="background:var(--gray)"></i> Non lavorativo</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+  </main>
+</div>
+<div id="mobilePanel" class="mobile-action-panel" onclick="closeWorkerWindow(event)">
+  <div class="mobile-sheet" onclick="event.stopPropagation()">
+    <div class="sheet-head">
+      <div>
+        <h3 id="sheetTitle">Ore</h3>
+        <p id="sheetSubtitle">Compila i campi in ordine.</p>
+      </div>
+      <button class="close-sheet" onclick="closeWorkerWindow()">×</button>
+    </div>
+
+    <div id="sheetOre" class="sheet-content">
+      <div class="simple-worker-form">
+        <div class="iphone-field">
+          <label>Giorno</label>
+          <input id="mDataOre" type="date">
+        </div>
+
+        <div class="iphone-field">
+          <label>Cantiere</label>
+          <select id="mCantiere" onchange="syncMobileEconomicPreview()">
+            <option>Lugano Centro - attivo</option>
+            <option>Paradiso Residenza - attivo</option>
+            <option>Viganello Appartamenti - attivo</option>
+          </select>
+        </div>
+
+        <div class="iphone-field">
+          <label>ID + Categoria</label>
+          <select id="mCategoria" onchange="aggiornaLavorazioniMobile()">
+            <option value="100">100 — Cartongesso</option>
+            <option value="200">200 — Rasatura / Intonaco</option>
+            <option value="300">300 — Isolamento</option>
+            <option value="400">400 — Pittura</option>
+            <option value="500">500 — Preparazione cantiere</option>
+            <option value="600">600 — Extra / Regia</option>
+          </select>
+        </div>
+
+        <div class="iphone-field">
+          <label>Lavorazione specifica</label>
+          <select id="mLavorazione"></select>
+        </div>
+
+        <div class="iphone-field">
+          <label>Ore</label>
+          <input id="mOre" type="number" min="0" max="12" step="0.25" value="8">
+        </div>
+      </div>
+
+      <div class="iphone-actions">
+        <button class="secondary" onclick="closeWorkerWindow()">Annulla</button>
+        <button class="primary" onclick="salvaOreMobileCollegate()">Invia ore</button>
+      </div>
+    </div>
+
+    <div id="sheetVacanze" class="sheet-content hidden">
+      <div class="iphone-form-row one">
+        <div class="iphone-field">
+          <label>Tipo richiesta</label>
+          <select id="mTipoRichiesta">
+            <option>Vacanze</option>
+            <option>Ore libere</option>
+            <option>Permesso</option>
+            <option>Recupero ore</option>
+          </select>
+        </div>
+      </div>
+      <div class="iphone-form-row">
+        <div class="iphone-field">
+          <label>Da</label>
+          <input id="mVacDa" type="date">
+        </div>
+        <div class="iphone-field">
+          <label>A</label>
+          <input id="mVacA" type="date">
+        </div>
+      </div>
+      <div class="iphone-form-row one">
+        <div class="iphone-field">
+          <label>Note</label>
+          <textarea id="mVacNote" placeholder="Motivo o comunicazione"></textarea>
+        </div>
+      </div>
+      <div class="iphone-actions">
+        <button class="secondary" onclick="closeWorkerWindow()">Annulla</button>
+        <button class="primary" onclick="demoSave(); closeWorkerWindow();">Invia richiesta</button>
+      </div>
+    </div>
+
+    <div id="sheetCalendario" class="sheet-content hidden">
+      <div class="calendar" id="calendarMobileOperaio"></div>
+      <div class="legend">
+        <span><i class="status-dot dot-green"></i> Ore approvate</span>
+        <span><i class="status-dot" style="background:var(--yellow)"></i> Da controllare</span>
+        <span><i class="status-dot" style="background:var(--blue)"></i> Vacanza</span>
+        <span><i class="status-dot" style="background:var(--gray)"></i> Non lavorativo</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="script.js"></script>
+</body>
+</html>

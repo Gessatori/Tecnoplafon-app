@@ -5302,3 +5302,66 @@ window.tpLogoutTecnoplafonFinale = async function(){
   window.addEventListener('load', function(){ setTimeout(applicaCollaboratore, 250); setTimeout(applicaCollaboratore, 1500); });
   setInterval(function(){ if(isCollaboratore()) applicaCollaboratore(); }, 2000);
 })();
+
+
+/* ===== V66 - PAGINE SEPARATE: login / operaio / admin ===== */
+(function(){
+  function setAuthClass(mode){
+    document.body.classList.add('tp-auth-ok');
+    if(mode === 'admin'){
+      document.body.classList.add('admin-view');
+      document.body.classList.remove('worker-view','tp-worker-mode');
+      try{ window.adminUnlocked = true; sessionStorage.setItem('tecnoplafonAdminUnlocked','1'); }catch(e){}
+    }else if(mode === 'operaio'){
+      document.body.classList.add('worker-view','tp-worker-mode');
+      document.body.classList.remove('admin-view');
+      try{ window.adminUnlocked = false; sessionStorage.removeItem('tecnoplafonAdminUnlocked'); }catch(e){}
+    }
+  }
+  function safeRemoveAdminDom(){
+    if(window.TP_PAGE_MODE !== 'operaio') return;
+    ['admin','ore','raccoltaOperai','cantieri','lavorazioni','collaboratori','regole','calendari','economia','linkedHoursPanel','adminAccessPanel','adminFloatingBtn','adminAccessBtn','adminLogoutBtn'].forEach(function(id){
+      var el = document.getElementById(id); if(el) el.remove();
+    });
+    document.querySelectorAll('aside, .role-switch, .admin-only-nav, .admin-economic-only').forEach(function(el){ el.remove(); });
+    var op = document.getElementById('operaio'); if(op){ op.classList.remove('hidden'); op.style.display='block'; }
+  }
+  if(window.TP_PAGE_MODE){
+    // buildCalendar originale va in errore se una pagina separata non contiene tutti i calendari.
+    var oldBuild = window.buildCalendar;
+    window.buildCalendar = function(target, admin){
+      if(!document.getElementById(target)) return;
+      if(typeof oldBuild === 'function') return oldBuild(target, admin);
+    };
+    var oldShow = window.showSection;
+    window.showSection = function(id){
+      if(window.TP_PAGE_MODE === 'operaio' && id !== 'operaio'){
+        setAuthClass('operaio');
+        safeRemoveAdminDom();
+        var op = document.getElementById('operaio'); if(op) op.classList.remove('hidden');
+        return false;
+      }
+      if(typeof oldShow === 'function') return oldShow.apply(this, arguments);
+    };
+    document.addEventListener('DOMContentLoaded', function(){
+      setAuthClass(window.TP_PAGE_MODE);
+      if(window.TP_PAGE_MODE === 'operaio'){
+        safeRemoveAdminDom();
+        try{ if(typeof showSection === 'function') showSection('operaio'); }catch(e){}
+      }else if(window.TP_PAGE_MODE === 'admin'){
+        try{ if(typeof showSection === 'function') showSection('admin'); }catch(e){}
+      }
+    });
+    window.addEventListener('load', function(){
+      setAuthClass(window.TP_PAGE_MODE);
+      if(window.TP_PAGE_MODE === 'operaio') safeRemoveAdminDom();
+      setTimeout(function(){ setAuthClass(window.TP_PAGE_MODE); if(window.TP_PAGE_MODE === 'operaio') safeRemoveAdminDom(); }, 300);
+      setTimeout(function(){ setAuthClass(window.TP_PAGE_MODE); if(window.TP_PAGE_MODE === 'operaio') safeRemoveAdminDom(); }, 1200);
+    });
+  }
+  window.tpLogoutTecnoplafonFinale = async function(){
+    try{ if(window.supabaseClient && window.supabaseClient.auth) await window.supabaseClient.auth.signOut(); }catch(e){}
+    try{ sessionStorage.clear(); localStorage.removeItem('tp_current_user_v66'); }catch(e){}
+    window.location.href = 'index.html';
+  };
+})();

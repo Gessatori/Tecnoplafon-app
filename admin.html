@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tecnoplafon - Admin</title>
+  
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="tp-auth-ok admin-view">
+<script>window.TP_PAGE_MODE="admin";</script>
+
+<button id="tpLogoutBtn" type="button" onclick="tpLogoutTecnoplafonFinale()">🚪 Logout</button>
+
+<div id="tpFullLogin">
+  <div class="tp-full-login-card">
+    <div class="tp-full-login-logo">
+      <img src="https://tecnoplafon.ch/wp-content/uploads/2019/08/TECNOPLAFON-logo_v01.png" alt="Tecnoplafon">
+    </div>
+    <h1>Gestione Ore</h1>
+    <p>Accedi con email e password Supabase.</p>
+
+    <label>Email</label>
+    <input id="tpFullEmail" type="email" value="info@tecnoplafon.ch" autocomplete="username">
+
+    <label>Password</label>
+    <input id="tpFullPassword" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter'){tpFullLoginSubmit()}">
+
+    <div id="tpFullLoginError"></div>
+
+    <button id="tpFullLoginBtn" onclick="tpFullLoginSubmit()">Entra</button>
+
+    <small>Admin e collaboratori usano lo stesso accesso. Il ruolo viene letto da Supabase.</small>
+  </div>
+</div>
+
+<button id="adminFloatingBtn" type="button" class="admin-floating-access" onclick="event.preventDefault(); event.stopPropagation(); openAdminAccess(); return false;">🔐 Accesso admin</button>
+
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div class="logo">TP</div>
+      <div>
+        <h1>Tecnoplafon</h1>
+        <span>Gestione ore collaboratori</span>
+      </div>
+    </div>
+    <nav>
+      <button class="active" onclick="showSection('operaio')">👷 Area operaio</button>
+      <button class="admin-only-nav" onclick="showSection('admin')">🛠️ Area admin / modifica ore</button>
+      <button class="admin-only-nav" onclick="showSection('ore')">⏱️ Raccolta ore</button>
+      <button class="admin-only-nav" onclick="showSection('raccoltaOperai')">📊 Raccolta operai</button>
+      <button class="admin-only-nav" onclick="showSection('cantieri')">🏗️ Cantieri</button>
+      <button class="admin-only-nav" onclick="showSection('lavorazioni')">🧩 ID lavorazioni</button>
+      <button class="admin-only-nav" onclick="showSection('collaboratori')">👥 Collaboratori</button>
+      <button class="admin-only-nav" onclick="showSection('regole')">⚙️ Regole e rimborsi</button>
+      <button class="admin-only-nav" onclick="showSection('calendari')">📅 Calendari</button>
+      <button class="admin-only-nav" onclick="showSection('economia')">💰 Economia cantiere</button>
+    </nav>
+    <div class="sidebar-note">
+      Demo iniziale professionale. I dati sono simulati per iniziare a lavorare su struttura, schermate e regole.
+    </div>
+  </aside>
+
+  <main>
+    <header>
+      <div>
+        <h2 id="pageTitle">Area operaio</h2>
+        <p id="pageSubtitle">Portale collaboratore: inserimento ore, richieste e riepilogo personale.</p>
+      </div>
+      <div class="header-actions">
+        <button id="adminAccessBtn" type="button" class="admin-login-btn" onclick="event.preventDefault(); event.stopPropagation(); openAdminAccess(); return false;">🔐 Accesso admin</button>
+        <button id="adminLogoutBtn" class="admin-logout-btn" onclick="logoutAdmin()">👷 Torna vista operaio</button>
+        <div class="role-switch">
+          <button class="active" onclick="showSection('operaio')">Operaio</button>
+          <button onclick="showSection('admin')">Admin</button>
+        </div>
+      </div>
+    </header>
+
+    <section id="operaio" class="section">
+      <div class="grid">
+        <div class="card span-12">
+          <h3>Portale collaboratore</h3>
+          <div class="quick">
+            <button class="big-btn" onclick="openWorkerWindow('ore')">
+              <b>⏱️ Ore</b>
+              <span>Inserimento ore del giorno corrente con cantiere, ID + categoria, lavorazione, pausa e note.</span>
+            </button>
+            <button class="big-btn" onclick="openWorkerWindow('vacanze')">
+              <b>🌴 Vacanze / ore libere</b>
+              <span>Richiesta vacanze, permessi, recuperi o ore libere con approvazione admin.</span>
+            </button>
+            <button class="big-btn" onclick="openWorkerWindow('calendario')">
+              <b>📋 Riepilogo</b>
+              <span>Riepilogo personale mensile con ore, ferie, giorni liberi e richieste. Nessun dato economico.</span>
+            </button>
+          </div>
+          <div class="mobile-helper">
+            Su iPhone, quando il collaboratore clicca un bottone, si apre subito una finestra dedicata con i campi in fila e pulsanti grandi.
+          </div>
+          <div class="alert worker-only-card" style="margin-top:14px">
+            Vista collaboratore pulita e sicura: disponibili solo Ore, Vacanze / ore libere e Riepilogo personale. Tutte le informazioni economiche restano solo lato admin.
+          </div>
+        </div>
+
+        <div id="formOre" class="card span-7">
+          <h3>Inserimento ore operaio</h3>
+          <div class="alert">
+            Regole finali pubblicazione: le ore da segnare sono dettate dalle regole admin. L’admin imposta il totale ore giornaliero previsto per orario invernale/estivo, i limiti di data, festivi e vacanze bloccate. La trasferta non è presente lato operaio.
+          </div>
+          <br>
+          <div class="form-grid">
+            <div class="f6">
+              <label>Data</label>
+              <input id="dataOre" type="date">
+            </div>
+            <div class="f6">
+              <label>Cantiere</label>
+              <select id="operaioCantiereSelect" onchange="syncEconomicPreview()">
+                <option>Lugano Centro - attivo</option>
+                <option>Paradiso Residenza - attivo</option>
+                <option>Viganello Appartamenti - attivo</option>
+              </select>
+            </div>
+            <div class="f12">
+              <label>ID + Categoria in unica finestra</label>
+              <select id="categoriaSelect" onchange="aggiornaLavorazioni()">
+                <option value="100">100 — Cartongesso</option>
+                <option value="200">200 — Rasatura / Intonaco</option>
+                <option value="300">300 — Isolamento</option>
+                <option value="400">400 — Pittura</option>
+                <option value="500">500 — Preparazione cantiere</option>
+                <option value="600">600 — Extra / Regia</option>
+              </select>
+            </div>
+            <div class="f12">
+              <label>Lavorazione specifica collegata</label>
+              <select id="lavorazioneSelect"></select>
+            </div>
+            <div class="f3">
+              <label>Dalle</label>
+              <input id="oraDaDesktop" type="time" value="07:00" onchange="calcolaOreDesktop()">
+            </div>
+            <div class="f3">
+              <label>Alle</label>
+              <input id="oraADesktop" type="time" value="16:00" onchange="calcolaOreDesktop()">
+            </div>
+            <div class="f3">
+              <label>Pausa</label>
+              <input id="pausaDesktop" type="number" min="0" step="0.25" value="0.5" onchange="calcolaOreDesktop()">
+            </div>
+            <div class="f3">
+              <label>Ore</label>
+              <input id="oreDesktop" type="number" min="0" max="12" step="0.25" value="8">
+            </div>
+            <div class="f12">
+              <label>Stato</label>
+              <select>
+                <option>Da approvare</option>
+                <option>Bozza</option>
+              </select>
+            </div>
+            <div class="f12">
+              <label>Note</label>
+              <textarea placeholder="Descrizione breve del lavoro svolto"></textarea>
+            </div>
+            <div class="f12">
+              <button class="primary" onclick="salvaOreCollegate()">Invia ore e collega al cantiere</button>
+              <button class="secondary" onclick="demoSave()">Salva bozza</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card span-5">
+          <h3>Controlli automatici</h3>
+          <div class="rule-list">
+            <div class="rule"><b>Regole admin</b><small>Le ore da segnare seguono il totale giornaliero impostato dall’admin per orario invernale o estivo.</small></div>
+            <div class="rule"><b>Festivi / vacanze</b><small>Giorni festivi e vacanze assegnate sono bloccati: nessun inserimento ore.</small></div>
+            <div class="rule"><b>Max ore</b><small>Massimo giornaliero deciso dall’admin.</small></div>
+            <div class="rule"><b>ID + Categoria</b><small>Scelta obbligatoria in una sola finestra.</small></div>
+            <div class="rule"><b>Trasferta</b><small>Non visibile e non modificabile dall’operaio.</small></div>
+          </div>
+          <h3 style="margin-top:18px">Tabella operaio senza trasferta</h3>
+          <table>
+            <thead><tr><th>Data</th><th>Cantiere</th><th>ID + categoria</th><th>Ore</th></tr></thead>
+            <tbody>
+              <tr><td>Oggi</td><td>Lugano Centro</td><td>100 — Cartongesso</td><td>8</td></tr>
+              <tr><td>Oggi</td><td>Paradiso</td><td>200 — Rasatura</td><td>2</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="formVacanze" class="card span-5">
+          <h3>Richiesta vacanze / ore libere</h3>
+          <div class="form-grid">
+            <div class="f6"><label>Tipo richiesta</label><select><option>Vacanze</option><option>Ore libere</option><option>Permesso</option><option>Recupero ore</option></select></div>
+            <div class="f6"><label>Periodo</label><input type="text" placeholder="es. 15.07 - 19.07"></div>
+            <div class="f12"><label>Motivo / note</label><textarea></textarea></div>
+            <div class="f12"><button class="primary" onclick="demoSave()">Invia richiesta</button></div>
+          </div>
+        </div>
+
+        <div id="calOperaio" class="card span-7">
+          <h3>Riepilogo personale mensile</h3>
+          <div class="calendar" id="calendarOperaio"></div>
+          <div class="legend">
+            <span><i class="status-dot dot-green"></i> Ore approvate</span>
+            <span><i class="status-dot" style="background:var(--yellow)"></i> Da controllare</span>
+            <span><i class="status-dot" style="background:var(--blue)"></i> Vacanza</span>
+            <span><i class="status-dot" style="background:var(--gray)"></i> Non lavorativo</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="admin" class="section hidden">
+      <div class="grid">
+        <div class="card span-3"><h3>Ore oggi</h3><p style="font-size:34px;margin:0;color:#0f172a;font-weight:950">34.5</p><p>Ore raccolte oggi</p></div>
+        <div class="card span-3"><h3>Da approvare</h3><p style="font-size:34px;margin:0;color:#92400e;font-weight:950">7</p><p>Registrazioni da verificare</p></div>
+        <div class="card span-3"><h3>Non segnate</h3><p style="font-size:34px;margin:0;color:#991b1b;font-weight:950">2</p><p>Collaboratori in rosso</p></div>
+        <div class="card span-3"><h3>Cantieri attivi</h3><p id="adminCantieriAttivi" style="font-size:34px;margin:0;color:#1e3a8a;font-weight:950">8</p><p>Con raccolta ore attiva</p></div>
+
+        <div class="card span-7">
+          <h3>Inserimento cantiere con km per regole rimborsi</h3>
+          <p>Qui l’admin inserisce il cantiere e la tratta semplice in km. L’app calcola automaticamente indennità giornaliera e AVS.</p>
+          <div class="form-grid">
+            <div class="f6"><label>Nome cantiere</label><input id="adminNomeCantiere" placeholder="Es. Lugano Centro"></div>
+            <div class="f6"><label>Cliente</label><input id="adminClienteCantiere" placeholder="Cliente"></div>
+            <div class="f6"><label>Indirizzo / luogo</label><input id="adminIndirizzoCantiere" placeholder="Indirizzo cantiere"></div>
+            <div class="f3"><label>Km tratta semplice</label><input id="adminKmCantiere" type="number" min="0" step="0.1" value="12" oninput="previewRegolaKm()"></div>
+            <div class="f3"><label>Stato</label><select id="adminStatoCantiere"><option>Attivo</option><option>Sospeso</option><option>Terminato</option></select></div>
+            <div class="f12">
+              <div class="km-rule-preview">
+                <div id="kmCard1" class="km-card"><b>0–30 km</b><span>fr. 15.-</span></div>
+                <div id="kmCard2" class="km-card"><b>31–40 km</b><span>fr. 20.-</span></div>
+                <div id="kmCard3" class="km-card"><b>41–60 km</b><span>fr. 27.-</span></div>
+                <div id="kmCard4" class="km-card"><b>oltre 60 km</b><span>fr. 37.-</span></div>
+              </div>
+            </div>
+            <div class="f4"><label>Indennità calcolata</label><input id="adminIndennitaCantiere" readonly value="15.-"></div>
+            <div class="f4"><label>AVS</label><input id="adminAvsCantiere" readonly value="No"></div>
+            <div class="f4"><label>Regola applicata</label><input id="adminRegolaCantiere" readonly value="0–30 km"></div>
+            <div class="f12"><button class="primary" onclick="aggiungiCantiereAdmin()">Salva cantiere</button></div>
+          </div>
+        </div>
+
+        <div class="card span-5">
+          <h3>Inserimento operaio</h3>
+          <p>L’admin può creare un operaio, attivarlo o terminarlo. Se terminato, l’accesso viene bloccato ma lo storico resta.</p>
+          <div class="form-grid">
+            <div class="f12"><label>Nome collaboratore</label><input id="adminNomeOperaio" placeholder="Nome e cognome"></div>
+            <div class="f12"><label>Email / utente</label><input id="adminEmailOperaio" placeholder="utente@tecnoplafon.ch"></div>
+            <div class="f6"><label>Ruolo</label><select id="adminRuoloOperaio"><option>Operaio</option><option>Caposquadra</option><option>Admin</option></select></div>
+            <div class="f6"><label>Stato</label><select id="adminStatoOperaio"><option>Attivo</option><option>Terminato</option></select></div>
+            <div class="f6"><label>Password iniziale</label><input id="adminPasswordOperaio" type="password" placeholder="••••••••"></div>
+            <div class="f6"><label>Max ore giorno</label><input id="adminMaxOreOperaio" type="number" value="10" min="0" step="0.25"></div>
+            <div class="f12"><button class="primary" onclick="aggiungiOperaioAdmin()">Salva operaio</button></div>
+          </div>
+        </div>
+
+        <div class="card span-12">
+          <h3>Presenza inserimento ore oggi</h3>
+          <p>Admin vede tutti i collaboratori: verde se hanno segnato le ore, rosso se non le hanno segnate.</p>
+          <div class="presence-always-actions">
+            <button id="btnPresenzeTutti" class="presence-action-btn active" onclick="setAdminPresenceFilter('tutti')">👥 Tutti <span id="countPresenzeTutti" class="mini-count">0</span></button>
+            <button id="btnPresenzeSegnate" class="presence-action-btn green" onclick="setAdminPresenceFilter('segnate')">✅ Ore oggi segnate <span id="countPresenzeSegnate" class="mini-count">0</span></button>
+            <button id="btnPresenzeDaSegnare" class="presence-action-btn red" onclick="setAdminPresenceFilter('daSegnare')">🔴 Da segnare <span id="countPresenzeDaSegnare" class="mini-count">0</span></button>
+          </div>
+          <button class="collapse-toggle" onclick="toggleCollapse('adminPresenzeCollapse')">
+            Mostra / nascondi presenza inserimento ore
+            <span>utile quando diventano tanti</span>
+          </button>
+          <div id="adminPresenzeCollapse" class="collapsible-content open">
+            <table>
+              <thead><tr><th>Stato</th><th>Collaboratore</th><th>Ore oggi</th><th>Ultimo inserimento</th><th>Avviso</th></tr></thead>
+              <tbody id="adminPresenzeBody">
+                <tr><td><span class="badge ok"><i class="status-dot dot-green"></i> Verde</span></td><td>Mario Rossi</td><td>8</td><td>07:18</td><td>Ore segnate</td></tr>
+                <tr><td><span class="badge ok"><i class="status-dot dot-green"></i> Verde</span></td><td>Luca Bianchi</td><td>8.5</td><td>07:34</td><td>Ore segnate</td></tr>
+                <tr><td><span class="badge bad"><i class="status-dot dot-red"></i> Rosso</span></td><td>Gianni Verdi</td><td>0</td><td>-</td><td>Mancano ore del giorno</td></tr>
+                <tr><td><span class="badge bad"><i class="status-dot dot-red"></i> Rosso</span></td><td>Marco Neri</td><td>0</td><td>-</td><td>Mancano ore del giorno</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card span-12">
+          <h3>Cantieri inseriti con regole km</h3>
+          <button class="collapse-toggle" onclick="toggleCollapse('adminCantieriCollapse')">
+            Mostra / nascondi cantieri inseriti
+            <span>utile quando diventano tanti</span>
+          </button>
+          <div id="adminCantieriCollapse" class="collapsible-content open">
+            <div class="status-filter-row">
+              <button id="btnCantieriAttivi" class="status-filter-btn active" onclick="setAdminView('cantieri','Attivo')">
+                Attivi <span id="countCantieriAttivi" class="mini-count">0</span>
+              </button>
+              <button id="btnCantieriTerminati" class="status-filter-btn" onclick="setAdminView('cantieri','Terminato')">
+                Terminati <span id="countCantieriTerminati" class="mini-count">0</span>
+              </button>
+            </div>
+            <div class="table-note-small">Vedi una sola sezione per volta. I totali generali continuano comunque a contare anche i terminati.</div>
+            <table>
+              <thead><tr><th>Cantiere</th><th>Cliente</th><th>Km</th><th>Indennità</th><th>AVS</th><th>Stato</th><th>Azioni</th></tr></thead>
+              <tbody id="adminCantieriBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card span-12">
+          <h3>Operai inseriti: attiva / termina</h3>
+          <button class="collapse-toggle" onclick="toggleCollapse('adminOperaiCollapse')">
+            Mostra / nascondi operai inseriti
+            <span>utile quando diventano tanti</span>
+          </button>
+          <div id="adminOperaiCollapse" class="collapsible-content open">
+            <div class="status-filter-row">
+              <button id="btnOperaiAttivi" class="status-filter-btn active" onclick="setAdminView('operai','Attivo')">
+                Attivi <span id="countOperaiAttivi" class="mini-count">0</span>
+              </button>
+              <button id="btnOperaiTerminati" class="status-filter-btn" onclick="setAdminView('operai','Terminato')">
+                Terminati <span id="countOperaiTerminati" class="mini-count">0</span>
+              </button>
+            </div>
+            <div class="table-note-small">Mostra solo attivi oppure solo terminati. Lo storico dei terminati resta e continua a contare nei totali generali.</div>
+            <table>
+              <thead><tr><th>Collaboratore</th><th>Email / utente</th><th>Ruolo</th><th>Stato</th><th>Max ore</th><th>Password</th><th>Azioni</th></tr></thead>
+              <tbody id="adminOperaiBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ore" class="section hidden">
+      <div class="card">
+        <h3>Raccolta ore admin</h3>
+        <table>
+          <thead><tr><th>Collaboratore</th><th>Data</th><th>Cantiere</th><th>ID + Categoria</th><th>Lavorazione</th><th>Ore</th><th>Stato</th></tr></thead>
+          <tbody>
+            <tr><td>Mario Rossi</td><td>03.06.2026</td><td>Lugano Centro</td><td>100 — Cartongesso</td><td>Controsoffitto</td><td>8</td><td><span class="badge wait">Da approvare</span></td></tr>
+            <tr><td>Luca Bianchi</td><td>03.06.2026</td><td>Paradiso</td><td>200 — Rasatura</td><td>Rasatura pareti</td><td>8.5</td><td><span class="badge ok">Approvato</span></td></tr>
+            <tr><td>Anna Gallo</td><td>03.06.2026</td><td>Viganello</td><td>300 — Isolamento</td><td>Isolamento acustico</td><td>7.5</td><td><span class="badge info">In controllo</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="raccoltaOperai" class="section hidden">
+      <div class="grid">
+        <div class="card span-12 no-print-card">
+          <h3>Raccolta operai: cantiere, tipologia e totali</h3>
+          <p>Vista admin per controllare le ore raccolte. Puoi filtrare per collaboratore, cantiere e lavorazione; anche la stampa regie usa gli stessi filtri.</p>
+          <div class="form-grid">
+            <div class="f4">
+              <label>Collaboratore</label>
+              <select id="raccoltaOperaioSelect" onchange="renderRaccoltaOperai()"></select>
+            </div>
+            <div class="f4">
+              <label>Mese stampa</label>
+              <input id="raccoltaMese" type="month" value="2026-06" onchange="renderRaccoltaOperai()">
+            </div>
+            <div class="f4">
+              <label>Filtro cantiere</label>
+              <select id="raccoltaCantiereSelect" onchange="renderRaccoltaOperai()">
+                <option value="__ALL__">Tutti i cantieri</option>
+              </select>
+            </div>
+            <div class="f4">
+              <label>Filtro lavorazione</label>
+              <select id="raccoltaLavorazioneSelect" onchange="renderRaccoltaOperai()">
+                <option value="__ALL__">Tutte le lavorazioni</option>
+              </select>
+            </div>
+            <div class="f4">
+              <label>Azioni</label>
+              <button class="primary" onclick="renderRaccoltaOperai()">Aggiorna</button>
+              <button class="secondary" onclick="stampaMensileCollaboratore()">Stampa mensile</button>
+              <button class="secondary" onclick="stampaRegie()">🖨️ Stampa regie</button>
+              <button class="primary edit-open-admin-btn" onclick="scrollToRigheModificaOre()">✏️ Trova pulsanti modifica</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card span-12 no-print-card">
+          <h3>Totali raccolta operai</h3>
+          <div class="analytics-kpis">
+            <div class="analytics-kpi"><span>Ore totali</span><b id="raccoltaTotOre">0</b></div>
+            <div class="analytics-kpi"><span>Trasferte totali</span><b id="raccoltaTotTrasferte">CHF 0</b></div>
+            <div class="analytics-kpi"><span>Giorni AVS sì</span><b id="raccoltaAvsSi">0</b></div>
+            <div class="analytics-kpi"><span>Giorni AVS no</span><b id="raccoltaAvsNo">0</b></div>
+          </div>
+          <div class="trend-table-wrap" style="margin-top:14px"><table id="raccoltaOperaiTable" class="trend-table"></table></div>
+        </div>
+
+        <div id="raccoltaOreDettaglioCard" class="card span-12 no-print-card">
+          <h3>✏️ Modifica ore collaboratori</h3>
+          <div class="edit-visible-callout">
+            Qui sotto compaiono gli inserimenti ore già salvati. Premi <b>Modifica</b> sulla riga desiderata: si apre l'Area admin e puoi modificare davvero l'inserimento salvato, cioè ore, cantiere, lavorazione e tipologia del lavoro.
+          </div>
+          <div class="trend-table-wrap" style="margin-top:14px"><table id="raccoltaOreDettaglioTable" class="trend-table"></table></div>
+        </div>
+
+        <div class="card span-12">
+          <div id="stampaMensileCollaboratore" class="print-panel">
+            <div class="print-head">
+              <div>
+                <h4>Tecnoplafon - Stampa mensile collaboratore</h4>
+                <p id="printCollaboratoreInfo">Collaboratore: -</p>
+              </div>
+              <div class="print-meta">
+                <b>Mese:</b> <span id="printMeseInfo">-</span><br>
+                Regole: AVS entro 10 km = Sì, oltre 10 km = No<br>
+                Trasferte: 0-30 km CHF 15, 31-40 km CHF 20, 41-60 km CHF 27, oltre 60 km CHF 37
+              </div>
+            </div>
+            <div class="timesheet-summary no-print">
+              <div class="box"><span>Ore mese</span><b id="printTotOre">0</b></div>
+              <div class="box"><span>Trasferte</span><b id="printTotTrasferte">CHF 0</b></div>
+              <div class="box"><span>AVS sì</span><b id="printAvsSi">0</b></div>
+              <div class="box"><span>AVS no</span><b id="printAvsNo">0</b></div>
+            </div>
+            <div class="print-section-title">Dettagli giornalieri</div>
+            <div class="trend-table-wrap"><table id="printDettaglioMensile" class="trend-table monthly-print-table"></table></div>
+
+            <div class="print-section-title">Riepilogo trasferte</div>
+            <p class="mini-note no-print">Le trasferte sono raggruppate per fascia/importo giornaliero. Sono visibili anche i giorni assoggettati AVS sì e AVS no.</p>
+            <div class="trend-table-wrap"><table id="printRiepilogoTrasferte" class="trend-table monthly-print-table"></table></div>
+
+            <div class="print-section-title">AVS</div>
+            <div class="trend-table-wrap"><table id="printRiepilogoAvs" class="trend-table monthly-print-table"></table></div>
+            <div class="admin-economic-only no-print">
+              <div class="print-section-title">Riepilogo interno per cantiere e tipologia</div>
+              <p class="mini-note">Solo admin: non viene stampato nella copia mensile del collaboratore.</p>
+              <div class="trend-table-wrap"><table id="printRiepilogoMensile" class="trend-table monthly-print-table"></table></div>
+            </div>
+            <div class="signature-row no-print">
+              <div class="signature-box">Firma collaboratore</div>
+              <div class="signature-box">Firma responsabile</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="stampaRegieCard" class="card span-12 regie-print-card">
+          <div id="stampaRegie" class="print-panel regie-print-panel">
+            <div class="regia-print-only-label">Foglio regia stampabile</div>
+            <div class="print-head">
+              <div>
+                <h4>Regia - foglio stampabile</h4>
+                <p id="printRegieInfo">Regia: -</p>
+              </div>
+              <div class="print-meta">
+                <b>Mese:</b> <span id="printRegieMeseInfo">-</span><br>
+                Solo regie filtrate per cantiere/lavorazione.<br>
+                Selezione: <span id="printRegieFiltroInfo">-</span>
+              </div>
+            </div>
+            <div class="regie-summary-boxes no-print">
+              <div class="box"><span>Ore regie</span><b id="printRegieTotOre">0</b></div>
+              <div class="box"><span>Giorni regie</span><b id="printRegieGiorni">0</b></div>
+              <div class="box"><span>Cantieri</span><b id="printRegieCantieri">0</b></div>
+              <div class="box"><span>Righe</span><b id="printRegieRighe">0</b></div>
+            </div>
+
+            <div class="print-section-title">Resoconto regie</div>
+            <div class="trend-table-wrap"><table id="printRegieDettaglio" class="trend-table monthly-print-table"></table></div>
+
+            <div class="riepilogo-regie-section no-print">
+              <div class="print-section-title">Riepilogo regie per cantiere</div>
+              <div id="printRegieRiepilogoWrap" class="trend-table-wrap"><table id="printRegieRiepilogo" class="trend-table monthly-print-table"></table></div>
+            </div>
+
+            <div class="firma-accettazione">
+              <h4>Firma per accettazione</h4>
+              <p>Con la firma si accetta la regia stampata sopra, comprensiva di cantiere, lavorazione, giornata e ore indicate.</p>
+              <div class="signature-row">
+                <div class="signature-box">Firma cliente / direzione lavori</div>
+                <div class="signature-box">Firma Tecnoplafon</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cantieri" class="section hidden">
+      <div class="grid">
+        <div class="card span-8">
+          <h3>Gestione cantieri</h3>
+          <p>I cantieri sono collegati anche alle regole rimborsi tramite km tratta semplice.</p>
+          <table>
+            <thead><tr><th>Cantiere</th><th>Cliente</th><th>Km</th><th>Indennità</th><th>AVS</th><th>Stato</th><th>Ore previste</th><th>Ore reali</th></tr></thead>
+            <tbody id="cantieriGestioneBody"></tbody>
+          </table>
+        </div>
+        <div class="card span-4">
+          <h3>Nuovo cantiere</h3>
+          <div class="form-grid">
+            <div class="f12"><label>Nome cantiere</label><input id="cantNome"></div>
+            <div class="f12"><label>Cliente</label><input id="cantCliente"></div>
+            <div class="f12"><label>Indirizzo</label><input id="cantIndirizzo"></div>
+            <div class="f6"><label>Km tratta semplice</label><input id="cantKm" type="number" value="12" min="0" step="0.1"></div>
+            <div class="f6"><label>Ore previste</label><input id="cantOrePreviste" type="number" value="0"></div>
+            <div class="f6"><label>Stato</label><select id="cantStato"><option>Attivo</option><option>Sospeso</option><option>Terminato</option></select></div>
+            <div class="f6"><label>Calcolo</label><input id="cantCalcolo" readonly value="automatico"></div>
+            <div class="f12"><button class="primary" onclick="aggiungiCantiereDaSezione()">Salva cantiere</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="lavorazioni" class="section hidden">
+      <div class="grid">
+        <div class="card span-7">
+          <h3>ID lavorazioni e categorie</h3>
+          <p>L’admin prepara una lista unica. L’operaio sceglie in una sola finestra “ID + Categoria”.</p>
+          <table>
+            <thead><tr><th>ID</th><th>Categoria</th><th>Lavorazioni collegate</th><th>Stato</th></tr></thead>
+            <tbody>
+              <tr><td>100</td><td>Cartongesso</td><td>Pareti, controsoffitti, velette, botole, contropareti</td><td><span class="badge ok">Attivo</span></td></tr>
+              <tr><td>200</td><td>Rasatura / Intonaco</td><td>Rasatura, stabilitura, ripristini</td><td><span class="badge ok">Attivo</span></td></tr>
+              <tr><td>300</td><td>Isolamento</td><td>Lana minerale, acustico, termico</td><td><span class="badge ok">Attivo</span></td></tr>
+              <tr><td>400</td><td>Pittura</td><td>Fondo, finitura, ritocchi</td><td><span class="badge ok">Attivo</span></td></tr>
+              <tr><td>500</td><td>Preparazione cantiere</td><td>Protezioni, demolizioni, pulizia</td><td><span class="badge ok">Attivo</span></td></tr>
+              <tr><td>600</td><td>Extra / Regia</td><td>Imprevisti, assistenze, lavori non previsti</td><td><span class="badge wait">Controllare</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card span-5">
+          <h3>Crea / modifica ID + Categoria</h3>
+          <div class="form-grid">
+            <div class="f4"><label>ID</label><input value="700"></div>
+            <div class="f8"><label>Categoria</label><input placeholder="Nuova categoria"></div>
+            <div class="f12"><label>Lavorazioni collegate</label><textarea placeholder="Una lavorazione per riga"></textarea></div>
+            <div class="f6"><label>Stato</label><select><option>Attivo</option><option>Non attivo</option></select></div>
+            <div class="f6"><label>Collegamento costo</label><input placeholder="opzionale"></div>
+            <div class="f12"><button class="primary" onclick="demoSave()">Salva ID lavorazione</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="collaboratori" class="section hidden">
+      <div class="grid">
+        <div class="card span-8">
+          <h3>Collaboratori attivi e terminati</h3>
+          <table>
+            <thead><tr><th>Collaboratore</th><th>Email / utente</th><th>Ruolo</th><th>Stato</th><th>Max ore</th><th>Password</th><th>Azioni</th></tr></thead>
+            <tbody id="collaboratoriBody"></tbody>
+          </table>
+        </div>
+        <div class="card span-4">
+          <h3>Scheda collaboratore</h3>
+          <div class="form-grid">
+            <div class="f12"><label>Nome</label><input id="collNome" placeholder="Nome e cognome"></div>
+            <div class="f12"><label>Email / utente</label><input id="collEmail" placeholder="utente@tecnoplafon.ch"></div>
+            <div class="f6"><label>Stato</label><select id="collStato"><option>Attivo</option><option>Terminato</option></select></div>
+            <div class="f6"><label>Ruolo</label><select id="collRuolo"><option>Operaio</option><option>Caposquadra</option><option>Admin</option></select></div>
+            <div class="f6"><label>Max ore giorno</label><input id="collMaxOre" type="number" value="10" min="0" step="0.25"></div>
+            <div class="f6"><label>Nuova password</label><input id="collPassword" type="password" placeholder="••••••••"></div>
+            <div class="f12"><button class="primary" onclick="aggiungiOperaioDaSezione()">Salva collaboratore</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="regole" class="section hidden">
+      <div class="grid">
+        <div class="card span-6">
+          <h3>Regole inserimento ore</h3>
+          <div class="rule-list">
+            <div class="rule"><b>Ore previste admin</b><small>Il totale del giorno viene calcolato dalle regole admin: orario invernale o orario estivo.</small></div>
+            <div class="rule"><b>Massimo ore</b><small>Limite impostato dall’admin, esempio 10 ore al giorno.</small></div>
+            <div class="rule"><b>ID + Categoria obbligatorio</b><small>Scelta unica dalla lista admin.</small></div>
+            <div class="rule"><b>Cantiere attivo</b><small>Si possono scegliere solo cantieri attivi.</small></div>
+            <div class="rule"><b>Collaboratore terminato</b><small>Accesso bloccato, storico conservato.</small></div>
+            <div class="rule"><b>Ore extra</b><small>Segnalate per controllo e approvazione admin.</small></div>
+          </div>
+        </div>
+
+        <div class="card span-6">
+          <h3>Regola AVS rimborsi</h3>
+          <div class="alert">
+            Regola richiesta: entro i 10 km AVS sì; oltre i 10 km AVS no.
+          </div>
+          <br>
+          <table>
+            <thead><tr><th>Tratta</th><th>AVS</th><th>Nota</th></tr></thead>
+            <tbody>
+              <tr><td>0 – 10 km</td><td><span class="badge ok">Sì</span></td><td>Assoggettato AVS</td></tr>
+              <tr><td>Oltre 10 km</td><td><span class="badge bad">No</span></td><td>Non assoggettato AVS</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card span-12">
+          <h3>Gestione mensile admin: ore, vacanze generali, festivi Ticino e regole orarie</h3>
+          <p>Seleziona un mese dell'anno, inserisci o modifica le ore dei collaboratori, registra vacanze generali, festivi Ticino automatici e imposta le regole che controllano l'inserimento ore lato operaio.</p>
+          <div class="admin-year-panel">
+            <label>Mesi dell'anno</label>
+            <div id="adminMonthGrid" class="month-grid"></div>
+            <div class="admin-month-kpis">
+              <div class="admin-month-kpi"><span>Mese selezionato</span><b id="adminMeseAttivoLabel">-</b></div>
+              <div class="admin-month-kpi"><span>Ore mese</span><b id="adminMeseOreTotali">0</b></div>
+              <div class="admin-month-kpi"><span>Vacanze / assenze</span><b id="adminMeseVacanzeTotali">0</b></div>
+              <div class="admin-month-kpi"><span>Regola max ore</span><b id="adminMeseMaxOre">10</b></div>
+            </div>
+
+            <div class="admin-subpanel open" style="display:block;margin-bottom:12px;background:#f8fbff">
+              <h3 style="margin-top:0">Totale ore fisso del mese</h3>
+              <p class="mini-note">Qui puoi scrivere il totale definitivo del mese selezionato. Quando lo fissi, il totale resta salvato e non cambia più anche se aggiungi o modifichi righe ore.</p>
+              <div class="form-grid">
+                <div class="f3"><label>Totale ore mese</label><input id="adminOreTotaleFisso" type="number" min="0" step="0.25" placeholder="Es. 168"></div>
+                <div class="f3"><label>Comando</label><button class="primary" onclick="adminSalvaTotaleOreFisso()">Fissa totale mese</button></div>
+                <div class="f3"><label>Sblocca</label><button class="secondary" onclick="adminSbloccaTotaleOreFisso()">Ricalcola automatico</button></div>
+                <div class="f3"><label>Stato</label><div id="adminOreFissoStato" class="alert" style="padding:10px 12px">Automatico</div></div>
+              </div>
+            </div>
+
+            <div class="admin-tabs">
+              <button id="tabOreMese" class="admin-tab active" onclick="setAdminMonthTab('ore')">Inserisci ore</button>
+              <button id="tabVacanzeMese" class="admin-tab" onclick="setAdminMonthTab('vacanze')">Vacanze generali</button>
+              <button id="tabRegoleMese" class="admin-tab" onclick="setAdminMonthTab('regole')">Regole orari</button>
+            </div>
+
+            <div id="panelOreMese" class="admin-subpanel open">
+              <h3>Inserimento / modifica ore collaboratori</h3>
+              <div id="adminOreEditBanner" class="admin-edit-banner">✏️ Modifica completa attiva: puoi cambiare giornata/data, ore lavorative, cantiere, lavorazione e tipologia di lavoro. Poi premi Aggiorna ore collaboratore.</div>
+              <div class="admin-edit-help">Per modificare un inserimento ore già salvato: premi <b>Modifica</b> nella riga sotto. La riga viene caricata qui e puoi cambiare <b>ore lavorative</b>, <b>cantiere</b>, <b>lavorazione</b> e <b>tipologia del lavoro</b>. Quando premi <b>Aggiorna ore collaboratore</b>, vengono aggiornati i dati salvati, non viene creata una doppia riga.</div>
+              <input id="adminOreEditIndex" type="hidden" value="">
+              <div class="form-grid">
+                <div class="f3"><label>Collaboratore / operaio</label><select id="adminOreCollaboratore"></select></div>
+                <div class="f3"><label>Giorno</label><input id="adminOreData" type="date"></div>
+                <div class="f3"><label>Cantiere</label><select id="adminOreCantiere"></select></div>
+                <div class="f3"><label>Tipologia lavoro / ID categoria</label><select id="adminOreCategoria" onchange="adminAggiornaLavorazioniMese(); adminAggiornaTipoEconomicoMese(true)"><option value="100">100 — Cartongesso</option><option value="200">200 — Rasatura / Intonaco</option><option value="300">300 — Isolamento</option><option value="400">400 — Pittura</option><option value="500">500 — Preparazione cantiere</option><option value="600">600 — Extra / Regia</option></select></div>
+                <div class="f3"><label>Tipologia economica lavoro</label><select id="adminOreTipoEconomico"></select></div>
+                <div class="f3"><label>Dalle</label><input id="adminOreDa" type="time" value="07:00" onchange="adminCalcolaOreMese()"></div>
+                <div class="f3"><label>Alle</label><input id="adminOreA" type="time" value="16:00" onchange="adminCalcolaOreMese()"></div>
+                <div class="f3"><label>Pausa</label><input id="adminOrePausa" type="number" min="0" step="0.25" value="1" onchange="adminCalcolaOreMese()"></div>
+                <div class="f3"><label>Ore calcolate</label><input id="adminOreTotale" type="number" min="0" step="0.25" value="8"></div>
+                <div class="f6"><label>Lavorazione specifica</label><select id="adminOreLavorazione" onchange="adminAggiornaTipoEconomicoMese(false)"></select></div>
+                <div class="f3"><label>Stato</label><select id="adminOreStato"><option>Approvato</option><option>Da approvare</option><option>In controllo</option></select></div>
+                <div class="f3"><label>Azione</label><button id="adminOreSaveBtn" class="primary" onclick="adminSalvaOreMese()">Salva ore nel mese</button></div>
+                <div class="f3"><label>Annulla modifica</label><button id="adminOreCancelBtn" class="secondary" style="display:none" onclick="adminAnnullaModificaOreMese()">Annulla modifica</button></div>
+              </div>
+            </div>
+
+            <div id="panelVacanzeMese" class="admin-subpanel">
+              <h3>Inserimento vacanze generali / chiusure aziendali</h3>
+              <p class="mini-note">Questa registrazione è generale: vale per tutti i collaboratori e non viene assegnata a un singolo operaio.</p>
+              <div class="form-grid">
+                <div class="f3"><label>Applicazione</label><input id="adminVacApplicazione" value="Generale / tutti" readonly></div>
+                <div class="f3"><label>Tipo</label><select id="adminVacTipo"><option>Vacanze generali</option><option>Chiusura aziendale</option><option>Giorno festivo</option><option>Ponte</option><option>Ore libere generali</option></select></div>
+                <div class="f3"><label>Dal</label><input id="adminVacDa" type="date"></div>
+                <div class="f3"><label>Al</label><input id="adminVacA" type="date"></div>
+                <div class="f9"><label>Note</label><input id="adminVacNote" placeholder="Es. chiusura aziendale, vacanze generali, ponte"></div>
+                <div class="f3"><label>Azione</label><button class="primary" onclick="adminSalvaVacanzaMese()">Salva vacanza generale</button></div>
+              </div>
+
+              <div class="ticino-holiday-panel">
+                <div class="ticino-holiday-head">
+                  <div>
+                    <h4>Festivi infrasettimanali Ticino automatici</h4>
+                    <p>Il programma calcola ogni anno i giorni festivi ufficiali del Ticino e inserisce solo quelli che cadono da lunedì a venerdì. Sono registrati come vacanze generali per tutti.</p>
+                  </div>
+                  <div class="admin-actions">
+                    <button class="tiny-btn green" onclick="adminInserisciFestiviTicinoAnno(true)">Aggiorna / inserisci festivi anno</button>
+                    <button class="tiny-btn red" onclick="adminRimuoviFestiviTicinoAnno()">Rimuovi festivi automatici anno</button>
+                  </div>
+                </div>
+                <div id="ticinoHolidayStatus" class="mini-note">Festivi automatici pronti.</div>
+                <div id="ticinoHolidayList" class="holiday-list"></div>
+              </div>
+            </div>
+
+            <div id="panelRegoleMese" class="admin-subpanel">
+              <h3>Regole orari per inserimento operaio</h3>
+              <p class="mini-note">Queste regole vengono controllate quando il collaboratore segna le ore. Se non rispetta orari, pausa o massimo ore, l'app lo avvisa e blocca il salvataggio.</p>
+              <div class="form-grid">
+                <div class="f3"><label>Ora minima entrata</label><input id="ruleOraMin" type="time" value="06:00"></div>
+                <div class="f3"><label>Ora massima uscita</label><input id="ruleOraMax" type="time" value="19:00"></div>
+                <div class="f3"><label>Pausa minima</label><input id="rulePausaMin" type="number" min="0" step="0.25" value="0.5"></div>
+                <div class="f3"><label>Max ore giorno</label><input id="ruleMaxOre" type="number" min="0" step="0.25" value="10"></div>
+                <div class="f3"><label>Ore giorno inverno</label><input id="ruleOreInverno" type="number" min="0" step="0.25" value="8"></div>
+                <div class="f3"><label>Ore giorno estate</label><input id="ruleOreEstate" type="number" min="0" step="0.25" value="8.5"></div>
+                <div class="f3"><label>Estate da mese</label><select id="ruleEstateDa"><option value="1">Gennaio</option><option value="2">Febbraio</option><option value="3">Marzo</option><option value="4" selected>Aprile</option><option value="5">Maggio</option><option value="6">Giugno</option><option value="7">Luglio</option><option value="8">Agosto</option><option value="9">Settembre</option><option value="10">Ottobre</option><option value="11">Novembre</option><option value="12">Dicembre</option></select></div>
+                <div class="f3"><label>Estate a mese</label><select id="ruleEstateA"><option value="1">Gennaio</option><option value="2">Febbraio</option><option value="3">Marzo</option><option value="4">Aprile</option><option value="5">Maggio</option><option value="6">Giugno</option><option value="7">Luglio</option><option value="8">Agosto</option><option value="9">Settembre</option><option value="10" selected>Ottobre</option><option value="11">Novembre</option><option value="12">Dicembre</option></select></div>
+                <div class="f3"><label>Solo giorno corrente</label><select id="ruleSoloOggi"><option value="si">Sì</option><option value="no">No</option></select></div>
+                <div class="f3"><label>Sabato / domenica</label><select id="ruleWeekend"><option value="blocca">Blocca</option><option value="avvisa">Avvisa solo</option><option value="permetti">Permetti</option></select></div>
+                <div class="f6"><label>Nota regola</label><input id="ruleNota" placeholder="Es. orario standard 07:00 - 16:00 con 1 ora pausa"></div>
+                <div class="f12"><button class="primary" onclick="salvaRegoleOrariAdmin()">Salva regole orari</button></div>
+              </div>
+              <div id="rulePreviewLine" class="rule-preview-line"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card span-12">
+          <h3>Riepilogo mese selezionato</h3>
+          <div class="trend-table-wrap"><table id="adminMonthTable" class="trend-table"></table></div>
+        </div>
+
+        <div class="card span-12">
+          <h3>Regole rimborsi giornalieri secondo tratta stradale</h3>
+          <p>Tabella inserita come da foto allegata. Gestione visibile solo lato admin.</p>
+          <table class="reimburse-table">
+            <thead><tr><th>Tratta semplice di percorso stradale in km</th><th>Indennità giornaliera in fr.</th><th>AVS</th></tr></thead>
+            <tbody>
+              <tr><td>0 – 30 km</td><td class="money">15.-</td><td>0–10 km sì, oltre 10 km no</td></tr>
+              <tr><td>31 – 40 km</td><td class="money">20.-</td><td>No</td></tr>
+              <tr><td>41 – 60 km</td><td class="money">27.-</td><td>No</td></tr>
+              <tr><td>oltre i 60 km</td><td class="money">37.-</td><td>No</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card span-12">
+          <h3>Editor regole admin</h3>
+          <div class="form-grid">
+            <div class="f3"><label>Max ore giorno</label><input type="number" value="10"></div>
+            <div class="f3"><label>Max ore settimana</label><input type="number" value="50"></div>
+            <div class="f3"><label>Solo giorno corrente</label><select><option>Sì</option><option>No</option></select></div>
+            <div class="f3"><label>Nota sopra ore</label><input type="number" value="8"></div>
+            <div class="f4"><label>Rimborso 0–30 km</label><input value="15.-"></div>
+            <div class="f4"><label>Rimborso 31–40 km</label><input value="20.-"></div>
+            <div class="f4"><label>Rimborso 41–60 km</label><input value="27.-"></div>
+            <div class="f4"><label>Rimborso oltre 60 km</label><input value="37.-"></div>
+            <div class="f4"><label>AVS entro 10 km</label><select><option>Sì</option><option>No</option></select></div>
+            <div class="f4"><label>AVS oltre 10 km</label><select><option>No</option><option>Sì</option></select></div>
+            <div class="f12"><button class="primary" onclick="demoSave()">Salva regole</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="calendari" class="section hidden">
+      <div class="grid">
+        <div class="card span-6">
+          <h3>Calendario annuale aziendale</h3>
+          <div class="pill-row">
+            <span class="pill">Sabato non lavorativo</span>
+            <span class="pill">Domenica non lavorativa</span>
+            <span class="pill">Festivi bloccati</span>
+            <span class="pill">Chiusure aziendali</span>
+            <span class="pill">Vacanze obbligatorie</span>
+          </div>
+          <br>
+          <table>
+            <thead><tr><th>Data</th><th>Tipo</th><th>Regola</th></tr></thead>
+            <tbody>
+              <tr><td>01.08.2026</td><td>Festivo</td><td>Blocco inserimento ore</td></tr>
+              <tr><td>24.12–06.01</td><td>Chiusura aziendale</td><td>Vacanze obbligatorie</td></tr>
+              <tr><td>Ogni domenica</td><td>Non lavorativo</td><td>Blocco salvo autorizzazione</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card span-6">
+          <h3>Calendario collaboratore lato admin</h3>
+          <div class="calendar" id="calendarAdmin"></div>
+          <div class="legend">
+            <span><i class="status-dot dot-green"></i> Ore approvate</span>
+            <span><i class="status-dot" style="background:var(--yellow)"></i> Da controllare</span>
+            <span><i class="status-dot" style="background:var(--red)"></i> Assenza/problema</span>
+            <span><i class="status-dot" style="background:var(--blue)"></i> Vacanza</span>
+            <span><i class="status-dot" style="background:var(--purple)"></i> Ore libere</span>
+            <span><i class="status-dot" style="background:var(--gray)"></i> Non lavorativo</span>
+            <span><i class="status-dot" style="background:var(--orange)"></i> Richiesta in attesa</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="economia" class="section hidden">
+      <div class="grid">
+        <div class="card span-12">
+          <h3>Analisi economica cantiere collegata alle ore</h3>
+          <div class="link-box">
+            Questa sezione è collegata all’inserimento ore: quando il collaboratore inserisce cantiere, ID + Categoria, lavorazione e ore, il dato entra anche qui e viene diviso per tipologia economica del cantiere.
+            La struttura riprende il supporto cantieri con tipologie, ore, materiali, preventivi e margini.
+          </div>
+        </div>
+
+        <div class="card span-4">
+          <h3>Cantiere attivo</h3>
+          <div class="form-grid">
+            <div class="f12">
+              <label>Cantiere</label>
+              <select id="econCantiere" onchange="cambiaCantiereEconomico()">
+                <option>Lugano Centro</option>
+                <option>Paradiso Residenza</option>
+                <option>Viganello Appartamenti</option>
+              </select>
+            </div>
+            <div class="f6">
+              <label>Costo ora CHF</label>
+              <input id="econCostoOra" type="number" value="60" min="0" step="0.05" onchange="renderEconomia()">
+            </div>
+            <div class="f6">
+              <label>Costo DIVIDERE CHF</label>
+              <input id="econCostoDividere" type="number" value="20" min="0" step="0.05" onchange="renderEconomia()">
+            </div>
+          </div>
+          <p class="mini-note">Il costo ora viene usato per trasformare le ore inserite dai collaboratori in costo manodopera.</p>
+        </div>
+
+        <div class="card span-8">
+          <h3>Collegamento automatico dall’inserimento ore</h3>
+          <table>
+            <thead><tr><th>Dato inserito dall’operaio</th><th>Dato usato nell’analisi economica</th></tr></thead>
+            <tbody>
+              <tr><td>Cantiere</td><td>Seleziona il cantiere economico corretto</td></tr>
+              <tr><td>ID + Categoria</td><td>Viene trasformato in tipologia economica: intonaco, gesso, isolazione, cartongesso, pittura, artigiani, dividere, altro</td></tr>
+              <tr><td>Ore</td><td>Entrano nel totale ore della tipologia</td></tr>
+              <tr><td>Collaboratore</td><td>Rimane nel dettaglio ore del cantiere</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card span-6">
+          <h3>Aggiungi materiale al cantiere</h3>
+          <div class="form-grid">
+            <div class="f6"><label>Data</label><input id="econDataMat" type="date"></div>
+            <div class="f6"><label>Tipologia</label><select id="econTipoMat"></select></div>
+            <div class="f8"><label>Materiale</label><input id="econMateriale" placeholder="Es. lastre, rasante, isolazione..."></div>
+            <div class="f4"><label>Costo CHF</label><input id="econCostoMat" type="number" min="0" step="0.05"></div>
+            <div class="f12"><button class="primary" onclick="aggiungiMaterialeEconomico()">Aggiungi materiale</button></div>
+          </div>
+        </div>
+
+        <div class="card span-6">
+          <h3>Preventivo generale e per tipologia</h3>
+          <p>Puoi inserire la cifra del preventivo totale del cantiere e anche dividere/modificare ogni singola tipologia di lavoro.</p>
+          <div class="form-grid">
+            <div class="f6">
+              <label>Preventivo generale CHF</label>
+              <input id="econPreventivoGenerale" type="number" min="0" step="0.05" value="0" oninput="renderEconomia()">
+            </div>
+            <div class="f6">
+              <label>Differenza generale / tipologie</label>
+              <input id="econDiffPreventivo" readonly value="0">
+            </div>
+          </div>
+          <div class="budget-grid" id="econBudgetGrid"></div>
+          <div style="margin-top:12px">
+            <button class="primary" onclick="salvaPreventiviTipologie()">Salva preventivi</button>
+            <button class="secondary" onclick="ripartisciPreventivoUguale()">Dividi generale in parti uguali</button>
+          </div>
+          <p class="mini-note">
+            Esempio: puoi mettere CHF 50’000 come preventivo generale e poi modificare Cartongesso, Pittura, Isolazione ecc. una per una.
+          </p>
+        </div>
+
+        </div>
+        </div>
+
+        <div class="card span-12 admin-economic-only">
+          <h3>Riepilogo economico per tipologia</h3>
+          <div class="econ-table-wrap"><table id="econRiepilogo" class="econ-table"></table></div>
+          <div style="margin-top:12px">
+            <button class="secondary" onclick="esportaEconomiaCSV()">Esporta riepilogo CSV</button>
+            <button class="secondary" onclick="window.print()">Stampa</button>
+          </div>
+        </div>
+
+        <div class="card span-6">
+          <h3>Ore collegate al cantiere</h3>
+          <p>Le ore collegate sono ora in una finestra separata, più pulita e comoda da leggere.</p>
+          <button class="action-open-panel" onclick="openLinkedHoursPanel()">📋 Apri ore collegate al cantiere</button>
+        </div>
+
+        <div class="card span-6">
+          <h3>Materiali collegati al cantiere</h3>
+          <button class="collapse-toggle" onclick="toggleCollapse('dettaglioMaterialiCumulati')">
+            Mostra / nascondi dettaglio materiali cumulati
+            <span>materiale, tipologia, costo</span>
+          </button>
+          <div id="dettaglioMaterialiCumulati" class="collapsible-content">
+            <div class="econ-table-wrap"><table id="econDettaglioMat" class="small-econ"></table></div>
+          </div>
+        </div>
+
+        <div class="card span-12">
+          <h3>Andamento cantiere per tipologia e collaboratori</h3>
+          <p>Selezione multipla: puoi scegliere più cantieri, più tipologie e più collaboratori insieme. La vista mostra andamento e totale collaboratori per cantiere.</p>
+          <div class="form-grid">
+            <div class="f4">
+              <label>Cantieri</label>
+              <div class="custom-multi-search">
+                <input id="trendCantieriSearch" placeholder="Trova cantiere">
+                <button class="find-btn" onclick="filterCustomMulti('trendCantieriBox','trendCantieriSearch')">Trova</button>
+              </div>
+              <div id="trendCantieriBox" class="custom-multi"></div>
+              <div class="custom-multi-actions">
+                <button onclick="setCustomMultiAll('trendCantieriBox', true); renderAndamentoCantiere()">Tutti</button>
+                <button onclick="setCustomMultiAll('trendCantieriBox', false); renderAndamentoCantiere()">Nessuno</button>
+              </div>
+            </div>
+
+            <div class="f4">
+              <label>Tipologie</label>
+              <div class="custom-multi-search">
+                <input id="trendTipologieSearch" placeholder="Trova tipologia">
+                <button class="find-btn" onclick="filterCustomMulti('trendTipologieBox','trendTipologieSearch')">Trova</button>
+              </div>
+              <div id="trendTipologieBox" class="custom-multi"></div>
+              <div class="custom-multi-actions">
+                <button onclick="setCustomMultiAll('trendTipologieBox', true); renderAndamentoCantiere()">Tutte</button>
+                <button onclick="setCustomMultiAll('trendTipologieBox', false); renderAndamentoCantiere()">Nessuna</button>
+              </div>
+            </div>
+
+            <div class="f4">
+              <label>Collaboratori</label>
+              <div class="custom-multi-search">
+                <input id="trendCollaboratoriSearch" placeholder="Trova collaboratore">
+                <button class="find-btn" onclick="filterCustomMulti('trendCollaboratoriBox','trendCollaboratoriSearch')">Trova</button>
+              </div>
+              <div id="trendCollaboratoriBox" class="custom-multi"></div>
+              <div class="custom-multi-actions">
+                <button onclick="setCustomMultiAll('trendCollaboratoriBox', true); renderAndamentoCantiere()">Tutti</button>
+                <button onclick="setCustomMultiAll('trendCollaboratoriBox', false); renderAndamentoCantiere()">Nessuno</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="analytics-kpis">
+            <div class="analytics-kpi"><span>Ore selezionate</span><b id="trendTotOre">0</b></div>
+            <div class="analytics-kpi"><span>Costo manodopera</span><b id="trendCosto">CHF 0</b></div>
+            <div class="analytics-kpi"><span>Collaboratori</span><b id="trendCollaboratoriTot">0</b></div>
+            <div class="analytics-kpi"><span>Cantieri</span><b id="trendCantieriTot">0</b></div>
+          </div>
+
+          <div class="grid" style="margin-top:16px">
+            <div class="card span-6" style="box-shadow:none">
+              <h3>Andamento per tipologia</h3>
+              <div id="trendBarTipologie"></div>
+            </div>
+            <div class="card span-6" style="box-shadow:none">
+              <h3>Totale collaboratori per cantiere</h3>
+              <div class="trend-table-wrap"><table id="trendCollaboratoriCantiere" class="trend-table"></table></div>
+            </div>
+          </div>
+
+          <button class="collapse-toggle" onclick="toggleCollapse('trendDettaglioRighe')">
+            Mostra / nascondi dettaglio righe selezionate
+            <span>utile quando i dati diventano tanti</span>
+          </button>
+          <div id="trendDettaglioRighe" class="collapsible-content">
+            <div class="trend-table-wrap"><table id="trendDettaglio" class="trend-table"></table></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="mobilePanel" class="mobile-action-panel" onclick="closeWorkerWindow(event)">
+  <div class="mobile-sheet" onclick="event.stopPropagation()">
+    <div class="sheet-head">
+      <div>
+        <h3 id="sheetTitle">Ore</h3>
+        <p id="sheetSubtitle">Compila i campi in ordine.</p>
+      </div>
+      <button class="close-sheet" onclick="closeWorkerWindow()">×</button>
+    </div>
+
+    <div id="sheetOre" class="sheet-content">
+      <div class="simple-worker-form">
+        <div class="iphone-field">
+          <label>Giorno</label>
+          <input id="mDataOre" type="date">
+        </div>
+
+        <div class="iphone-field">
+          <label>Cantiere</label>
+          <select id="mCantiere" onchange="syncMobileEconomicPreview()">
+            <option>Lugano Centro - attivo</option>
+            <option>Paradiso Residenza - attivo</option>
+            <option>Viganello Appartamenti - attivo</option>
+          </select>
+        </div>
+
+        <div class="iphone-field">
+          <label>ID + Categoria</label>
+          <select id="mCategoria" onchange="aggiornaLavorazioniMobile()">
+            <option value="100">100 — Cartongesso</option>
+            <option value="200">200 — Rasatura / Intonaco</option>
+            <option value="300">300 — Isolamento</option>
+            <option value="400">400 — Pittura</option>
+            <option value="500">500 — Preparazione cantiere</option>
+            <option value="600">600 — Extra / Regia</option>
+          </select>
+        </div>
+
+        <div class="iphone-field">
+          <label>Lavorazione specifica</label>
+          <select id="mLavorazione"></select>
+        </div>
+
+        <div class="iphone-field">
+          <label>Ore</label>
+          <input id="mOre" type="number" min="0" max="12" step="0.25" value="8">
+        </div>
+      </div>
+
+      <div class="iphone-actions">
+        <button class="secondary" onclick="closeWorkerWindow()">Annulla</button>
+        <button class="primary" onclick="salvaOreMobileCollegate()">Invia ore</button>
+      </div>
+    </div>
+
+    <div id="sheetVacanze" class="sheet-content hidden">
+      <div class="iphone-form-row one">
+        <div class="iphone-field">
+          <label>Tipo richiesta</label>
+          <select id="mTipoRichiesta">
+            <option>Vacanze</option>
+            <option>Ore libere</option>
+            <option>Permesso</option>
+            <option>Recupero ore</option>
+          </select>
+        </div>
+      </div>
+      <div class="iphone-form-row">
+        <div class="iphone-field">
+          <label>Da</label>
+          <input id="mVacDa" type="date">
+        </div>
+        <div class="iphone-field">
+          <label>A</label>
+          <input id="mVacA" type="date">
+        </div>
+      </div>
+      <div class="iphone-form-row one">
+        <div class="iphone-field">
+          <label>Note</label>
+          <textarea id="mVacNote" placeholder="Motivo o comunicazione"></textarea>
+        </div>
+      </div>
+      <div class="iphone-actions">
+        <button class="secondary" onclick="closeWorkerWindow()">Annulla</button>
+        <button class="primary" onclick="demoSave(); closeWorkerWindow();">Invia richiesta</button>
+      </div>
+    </div>
+
+    <div id="sheetCalendario" class="sheet-content hidden">
+      <div class="calendar" id="calendarMobileOperaio"></div>
+      <div class="legend">
+        <span><i class="status-dot dot-green"></i> Ore approvate</span>
+        <span><i class="status-dot" style="background:var(--yellow)"></i> Da controllare</span>
+        <span><i class="status-dot" style="background:var(--blue)"></i> Vacanza</span>
+        <span><i class="status-dot" style="background:var(--gray)"></i> Non lavorativo</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="adminAccessPanel" class="admin-access-panel" onclick="closeAdminAccess(event)">
+  <div class="admin-access-box" onclick="event.stopPropagation()">
+    <h3>🔐 Accesso admin</h3>
+    <p>Inserisci la password admin per aprire il pannello completo.</p>
+    <label>Password admin</label>
+    <input id="adminAccessPassword" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter'){adminLoginSubmit()}">
+    <div id="adminAccessError" class="admin-access-error">Password admin non corretta.</div>
+    <div class="admin-access-actions">
+      <button class="secondary" onclick="closeAdminAccess()">Annulla</button>
+      <button class="primary" onclick="adminLoginSubmit()">Entra admin</button>
+    </div>
+  </div>
+</div>
+
+<div id="linkedHoursPanel" class="linked-hours-panel" onclick="closeLinkedHoursPanel(event)">
+  <div class="linked-hours-box" onclick="event.stopPropagation()">
+    <div class="linked-hours-head">
+      <div>
+        <h3>Ore collegate al cantiere</h3>
+        <p>Vista separata con selezione multipla, totali per collaboratore e collegamento al costo cantiere.</p>
+      </div>
+      <button class="linked-hours-close" onclick="closeLinkedHoursPanel()">×</button>
+    </div>
+
+    <div class="linked-hours-filters">
+      <div>
+        <label>Cantieri</label>
+        <div class="custom-multi-search">
+          <input id="linkedOreCantieriSearch" placeholder="Trova cantiere">
+          <button class="find-btn" onclick="filterCustomMulti('linkedOreCantieriBox','linkedOreCantieriSearch')">Trova</button>
+        </div>
+        <div id="linkedOreCantieriBox" class="custom-multi"></div>
+        <div class="custom-multi-actions">
+          <button onclick="setCustomMultiAll('linkedOreCantieriBox', true); renderLinkedHoursPanel()">Tutti</button>
+          <button onclick="setCustomMultiAll('linkedOreCantieriBox', false); renderLinkedHoursPanel()">Nessuno</button>
+        </div>
+      </div>
+
+      <div>
+        <label>Collaboratori</label>
+        <div class="custom-multi-search">
+          <input id="linkedOreCollaboratoriSearch" placeholder="Trova collaboratore">
+          <button class="find-btn" onclick="filterCustomMulti('linkedOreCollaboratoriBox','linkedOreCollaboratoriSearch')">Trova</button>
+        </div>
+        <div id="linkedOreCollaboratoriBox" class="custom-multi"></div>
+        <div class="custom-multi-actions">
+          <button onclick="setCustomMultiAll('linkedOreCollaboratoriBox', true); renderLinkedHoursPanel()">Tutti</button>
+          <button onclick="setCustomMultiAll('linkedOreCollaboratoriBox', false); renderLinkedHoursPanel()">Nessuno</button>
+        </div>
+      </div>
+
+      <div>
+        <label>Tipologie</label>
+        <div class="custom-multi-search">
+          <input id="linkedOreTipologieSearch" placeholder="Trova tipologia">
+          <button class="find-btn" onclick="filterCustomMulti('linkedOreTipologieBox','linkedOreTipologieSearch')">Trova</button>
+        </div>
+        <div id="linkedOreTipologieBox" class="custom-multi"></div>
+        <div class="custom-multi-actions">
+          <button onclick="setCustomMultiAll('linkedOreTipologieBox', true); renderLinkedHoursPanel()">Tutte</button>
+          <button onclick="setCustomMultiAll('linkedOreTipologieBox', false); renderLinkedHoursPanel()">Nessuna</button>
+        </div>
+      </div>
+
+      <div>
+        <label>Ordina per</label>
+        <select id="linkedOreSort" onchange="renderLinkedHoursPanel()">
+          <option value="cantiere">Cantiere</option>
+          <option value="collaboratore">Collaboratore</option>
+          <option value="tipo">Tipologia</option>
+          <option value="data">Data</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="linked-hours-kpi">
+      <div><span>Ore totali</span><b id="linkedOreTotali">0</b></div>
+      <div><span>Costo manodopera</span><b id="linkedOreCosto">CHF 0</b></div>
+      <div><span>Collaboratori</span><b id="linkedOreNumColl">0</b></div>
+      <div><span>Cantieri</span><b id="linkedOreNumCant">0</b></div>
+    </div>
+
+    <div class="grid">
+      <div class="card span-5" style="box-shadow:none">
+        <h3>Totale per collaboratore</h3>
+        <div class="trend-table-wrap"><table id="linkedOrePerCollaboratore" class="trend-table"></table></div>
+      </div>
+      <div class="card span-7" style="box-shadow:none">
+        <h3>Dettaglio ore collegate</h3>
+        <div class="trend-table-wrap"><table id="econDettaglioOre" class="trend-table"></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- v41: Fix modifica dopo login admin - il pulsante Modifica memorizza la riga, apre login se serve e poi carica davvero ore, cantiere, lavorazione e tipologia del lavoro. -->
+
+<!-- Supabase login Tecnoplafon completo -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- Fine Supabase login Tecnoplafon completo -->
+
+<!-- Supabase cantieri Tecnoplafon FIX -->
+
+<!-- Fine Supabase cantieri Tecnoplafon FIX -->
+
+<!-- Supabase cantieri visibili anche al collaboratore -->
+
+<!-- Fine Supabase cantieri visibili anche al collaboratore -->
+
+<!-- Email richiesta ferie/ore FIX apertura Mail -->
+
+<div id="tpRequestModal" class="tp-request-modal">
+  <div class="tp-request-box">
+    <h3>Invia richiesta</h3>
+    <p>Scegli se la richiesta è conteggiata in giorni o in ore. Poi premi “Apri email”.</p>
+
+    <label>Tipo richiesta</label>
+    <select id="tpReqTipo">
+      <option value="Vacanza">Vacanza</option>
+      <option value="Permesso">Permesso</option>
+      <option value="Ore libere">Ore libere</option>
+      <option value="Recupero ore">Recupero ore</option>
+      <option value="Assenza">Assenza</option>
+    </select>
+
+    <label>Conteggio</label>
+    <select id="tpReqConteggio" onchange="tpAggiornaLabelQuantita()">
+      <option value="giorni">Giorni</option>
+      <option value="ore">Ore</option>
+    </select>
+
+    <label id="tpReqQuantitaLabel">Numero giorni</label>
+    <input id="tpReqQuantita" type="number" min="0" step="0.5" placeholder="Es. 1">
+
+    <label>Data inizio</label>
+    <input id="tpReqDataDa" type="date">
+
+    <label>Data fine, se più giorni</label>
+    <input id="tpReqDataA" type="date">
+
+    <label>Note</label>
+    <textarea id="tpReqNote" placeholder="Scrivi una nota, se serve"></textarea>
+
+    <div id="tpReqHelp" class="tp-request-help">
+      Se non si apre l'app email, controlla che sul telefono sia configurata l'app Mail/Gmail. Su PC serve un programma email predefinito.
+    </div>
+
+    <div class="tp-request-actions">
+      <button class="tp-request-cancel" onclick="tpChiudiRichiestaModal()">Annulla</button>
+      <button class="tp-request-send" onclick="tpApriEmailRichiestaSubito()">Apri email</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fine email richiesta ferie/ore FIX apertura Mail -->
+
+<!-- v48 FIX DEFINITIVO: cantieri Supabase aggiornano davvero la sezione Cantieri, non solo le ricerche -->
+
+<!-- Fine v48 FIX DEFINITIVO cantieri Supabase -->
+
+<!-- v49 FIX: Raccolta operai mostra sempre cantieri e lavorazioni nei filtri -->
+
+<!-- Fine v49 FIX Raccolta operai -->
+  <script src="script.js"></script>
+</body>
+</html>
+
+<!-- v48: Ore da segnare dettate dalle regole admin. Totale giorno invernale/estivo impostabile dall'admin, calcolo mancanti e blocco superamento ore previste. -->
