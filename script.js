@@ -18,7 +18,7 @@ const titles = {
     "500":["Protezioni","Demolizioni","Pulizia cantiere","Preparazione supporti"],
     "600":["Regia","Imprevisti","Assistenze","Lavori non previsti"]
   };
-  const ADMIN_PASSWORD = "TP2026";
+  // Sicurezza: nessuna password admin locale nel codice JS.
   let adminUnlocked = sessionStorage.getItem("tecnoplafonAdminUnlocked") === "1";
   let pendingAdminOreEditIndex = null;
 
@@ -47,25 +47,12 @@ const titles = {
   }
 
   function adminLoginSubmit(){
-    const input = document.getElementById('adminAccessPassword');
     const err = document.getElementById('adminAccessError');
-    const pass = input ? input.value.trim() : '';
-    if(pass === ADMIN_PASSWORD){
-      adminUnlocked = true;
-      sessionStorage.setItem('tecnoplafonAdminUnlocked','1');
-      if(err) err.style.display = 'none';
-      closeAdminAccess();
-      showSection('admin');
-      if(pendingAdminOreEditIndex !== null && pendingAdminOreEditIndex !== undefined){
-        const idx = pendingAdminOreEditIndex;
-        pendingAdminOreEditIndex = null;
-        setTimeout(()=>{
-          vaiAModificaOreAdmin(idx);
-        }, 120);
-      }
+    if(err){
+      err.textContent = 'Per sicurezza non esiste piu una password admin dentro il file. Accedi da index.html con un profilo admin Supabase autorizzato.';
+      err.style.display = 'block';
     }else{
-      if(err) err.style.display = 'block';
-      if(input){ input.focus(); input.select(); }
+      alert('Password admin locale rimossa. Accedi da index.html con un profilo admin autorizzato.');
     }
   }
 
@@ -3785,7 +3772,7 @@ window.tpLogoutTecnoplafonFinale = async function(){
       email: row.email || "",
       ruolo: row.ruolo || "Operaio",
       stato: row.stato || "Attivo",
-      password: row.password_app || row.password || "",
+      password: row.password || "",
       maxOre: Number(row.max_ore_giorno || row.maxOre || 10)
     };
   }
@@ -3820,7 +3807,7 @@ window.tpLogoutTecnoplafonFinale = async function(){
     }catch(e){ console.warn("Collaboratore locale non aggiornato", e); }
   }
   async function tpFindCollaboratoreV52(sb, o){
-    var cols = "id,nome,email,ruolo,stato,password_app,max_ore_giorno";
+    var cols = "id,nome,email,ruolo,stato,max_ore_giorno";
     var email = tpTrimV52(o.email);
     var nome = tpTrimV52(o.nome);
     if(email){
@@ -3846,7 +3833,7 @@ window.tpLogoutTecnoplafonFinale = async function(){
       password_app: tpTrimV52(o.password) || null,
       max_ore_giorno: Number(o.maxOre || 10)
     };
-    var cols = "id,nome,email,ruolo,stato,password_app,max_ore_giorno";
+    var cols = "id,nome,email,ruolo,stato,max_ore_giorno";
     var existing = await tpFindCollaboratoreV52(sb, o);
     var res;
     if(existing && existing.id){
@@ -3862,7 +3849,7 @@ window.tpLogoutTecnoplafonFinale = async function(){
     if(!sb) return [];
     var res = await sb
       .from("collaboratori")
-      .select("id,nome,email,ruolo,stato,password_app,max_ore_giorno")
+      .select("id,nome,email,ruolo,stato,max_ore_giorno")
       .order("nome", {ascending:true});
     if(res.error) throw res.error;
     var lista = (res.data || []).map(tpNormCollV52).filter(function(x){ return x.nome; });
@@ -4016,23 +4003,22 @@ window.tpLogoutTecnoplafonFinale = async function(){
   async function tpLoginCollaboratoreTabellaV53(emailOrUser, password){
     var sb = tpSbV53();
     if(!sb) throw new Error("Supabase non collegato.");
-    var cols = "id,nome,email,ruolo,stato,password_app,max_ore_giorno";
+    var cols = "id,nome,email,ruolo,stato,max_ore_giorno";
     var user = tpTrimV53(emailOrUser);
     var row = null;
 
     if(user.indexOf("@") >= 0){
-      var byEmail = await sb.from("collaboratori").select(cols).eq("email", user).maybeSingle();
+      var byEmail = await sb.from("collaboratori").select(cols).eq("email", user).eq("password_app", password).maybeSingle();
       if(byEmail.error && byEmail.error.code !== "PGRST116") throw byEmail.error;
       row = byEmail.data;
     }
     if(!row){
-      var byNome = await sb.from("collaboratori").select(cols).ilike("nome", user).maybeSingle();
+      var byNome = await sb.from("collaboratori").select(cols).ilike("nome", user).eq("password_app", password).maybeSingle();
       if(byNome.error && byNome.error.code !== "PGRST116") throw byNome.error;
       row = byNome.data;
     }
-    if(!row) throw new Error("Collaboratore non trovato nella tabella collaboratori.");
+    if(!row) throw new Error("Collaboratore non trovato o password collaboratore non corretta.");
     if(tpTrimV53(row.stato).toLowerCase() !== "attivo") throw new Error("Accesso bloccato: collaboratore non Attivo.");
-    if(tpTrimV53(row.password_app) !== String(password || "")) throw new Error("Password collaboratore non corretta.");
 
     window.supabaseProfiloCorrente = {
       id: row.id,
@@ -5098,7 +5084,7 @@ window.tpLogoutTecnoplafonFinale = async function(){
       email: row.email || "",
       ruolo: row.ruolo || "Operaio",
       stato: row.stato || "Attivo",
-      password: row.password_app || row.password || "",
+      password: row.password || "",
       maxOre: Number(row.max_ore_giorno || row.maxOre || 10)
     };
   }
@@ -5115,7 +5101,7 @@ window.tpLogoutTecnoplafonFinale = async function(){
     if(!sb){ if(showAlert) alert("Supabase non collegato."); return []; }
     var res = await sb
       .from("collaboratori")
-      .select("id,nome,email,ruolo,stato,password_app,max_ore_giorno")
+      .select("id,nome,email,ruolo,stato,max_ore_giorno")
       .order("nome", {ascending:true});
     if(res.error){
       console.error("Errore caricamento collaboratori V60:", res.error);
