@@ -5475,3 +5475,284 @@ window.tpLogoutTecnoplafonFinale = async function(){
     if(window.TP_PAGE_MODE === 'operaio') cleanOperaioV67();
   });
 })();
+
+
+/* ===== V70 - Ore operaio su tabella esistente ore_lavoro ===== */
+(function(){
+  const TABLE_ORE = 'ore_lavoro';
+  const VIEW_ORE = 'v_ore_lavoro_complete';
+  const STATO_CANDIDATES = ['da_approvare','Da approvare','in_attesa','Inserita','bozza','Bozza','approvato','Approvato'];
+
+  function sbClient(){ return window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null); }
+  function getCurrentUser(){
+    try{
+      const raw = sessionStorage.getItem('tp_current_user_v66') || localStorage.getItem('tp_current_user_v66');
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function fmtErr(e){ return (e && (e.message || e.details || e.hint || e.code)) ? [e.message,e.details,e.hint,e.code].filter(Boolean).join(' - ') : String(e || 'Errore sconosciuto'); }
+  function cleanDate(d){
+    d = String(d || '');
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    if(/^\d{2}\.\d{2}\.\d{4}$/.test(d)){ const p=d.split('.'); return p[2]+'-'+p[1]+'-'+p[0]; }
+    return d || (typeof localTodayIso === 'function' ? localTodayIso() : new Date().toISOString().slice(0,10));
+  }
+  function toNumber(v, def){
+    if(v === '' || v == null) return def || 0;
+    const n = Number(String(v).replace(',', '.'));
+    return Number.isFinite(n) ? n : (def || 0);
+  }
+  function isUuid(v){ return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||'')); }
+  function first(obj, names, def){
+    for(const n of names){ if(obj && obj[n] !== undefined && obj[n] !== null && obj[n] !== '') return obj[n]; }
+    return def || '';
+  }
+  function normalize(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim(); }
+  function codeFromText(s){ const m = String(s||'').match(/\d+/); return m ? m[0] : ''; }
+  function noteFrom(id){ return document.getElementById(id)?.value || ''; }
+
+  const tableCache = {};
+  async function fetchTable(table){
+    if(tableCache[table]) return tableCache[table];
+    const sb = sbClient();
+    if(!sb) return [];
+    const res = await sb.from(table).select('*').limit(1000);
+    if(res.error){ console.warn('Lookup non riuscito per '+table, res.error); tableCache[table] = []; return []; }
+    tableCache[table] = res.data || [];
+    return tableCache[table];
+  }
+  function rowText(r){
+    return normalize([
+      r.codice, r.numero, r.id_numero, r.nome, r.name, r.titolo, r.title, r.descrizione, r.label, r.categoria, r.tipo, r.indirizzo
+    ].filter(Boolean).join(' '));
+  }
+  async function findId(table, wanted, extra){
+    wanted = String(wanted || '');
+    if(isUuid(wanted)) return wanted;
+    const rows = await fetchTable(table);
+    if(!rows.length) return null;
+    const nw = normalize(wanted);
+    const code = codeFromText(wanted);
+    let found = null;
+    if(code){
+      found = rows.find(r => [r.codice,r.numero,r.id_numero,r.code].some(v => String(v||'') === code));
+      if(found) return found.id || null;
+    }
+    found = rows.find(r => rowText(r) === nw) || rows.find(r => rowText(r).includes(nw) || nw.includes(rowText(r)));
+    if(found) return found.id || null;
+    if(extra){
+      const ne = normalize(extra);
+      found = rows.find(r => rowText(r).includes(ne));
+      if(found) return found.id || null;
+    }
+    return null;
+  }
+  async function buildOrePayload(row, stato){
+    const p = getCurrentUser() || {};
+    const cantiereId = await findId('cantieri', row.cantiere);
+    const categoriaId = await findId('categorie_lavoro', row.idCat || row.id_cat);
+    const lavorazioneId = await findId('lavorazioni', row.lavorazione, row.idCat || row.id_cat);
+    const tipoId = await findId('tipologie_economiche', row.tipo || row.idCat || row.id_cat);
+    const collaboratoreId = isUuid(row.collaboratore_id) ? row.collaboratore_id : (isUuid(p.id) ? p.id : null);
+    return {
+      data: cleanDate(row.data),
+      collaboratore_id: collaboratoreId,
+      cantiere_id: cantiereId,
+      categoria_lavoro_id: categoriaId,
+      lavorazione_id: lavorazioneId,
+      tipologia_economica_id: tipoId,
+      ora_da: row.da || row.ora_da || null,
+      ora_a: row.a || row.ora_a || null,
+      pausa_ore: toNumber(row.pausa ?? row.pausa_ore, 0),
+      ore: toNumber(row.ore, 0),
+      stato: stato || 'da_approvare',
+      assegnato_da: row.assegnatoDa || row.assegnato_da || 'Collaboratore / App',
+      note: row.note || '',
+      avs: row.avs === true || row.avs === 'Sì' || row.avs === 'Si',
+      trasferta_chf: toNumber(row.trasferta_chf, 0),
+      created_by: isUuid(p.id) ? p.id : null,
+      updated_at: new Date().toISOString()
+    };
+  }
+  function supaToLocal(r){
+    const cantiere = first(r, ['cantiere','cantiere_nome','nome_cantiere','cantieri_nome','cantieri']);
+    const collaboratore = first(r, ['collaboratore','collaboratore_nome','nome_collaboratore','nome','collaboratori_nome']);
+    const catCode = first(r, ['categoria_codice','codice_categoria','codice','id_cat']);
+    const catName = first(r, ['categoria_lavoro','categoria_nome','nome_categoria','categoria']);
+    const idCat = [catCode, catName].filter(Boolean).join(' — ') || first(r, ['idCat','id_cat']);
+    return {
+      supabase_id: r.id,
+      data: cleanDate(r.data),
+      cantiere: cantiere || '',
+      cantiere_id: r.cantiere_id || '',
+      collaboratore: collaboratore || '',
+      collaboratore_id: r.collaboratore_id || '',
+      idCat: idCat,
+      categoria_lavoro_id: r.categoria_lavoro_id || '',
+      lavorazione: first(r, ['lavorazione','lavorazione_nome','nome_lavorazione']),
+      lavorazione_id: r.lavorazione_id || '',
+      tipo: first(r, ['tipologia_economica','tipologia_nome','tipo','tipo_economico']),
+      tipologia_economica_id: r.tipologia_economica_id || '',
+      ore: toNumber(r.ore, 0),
+      da: r.ora_da || '',
+      a: r.ora_a || '',
+      pausa: r.pausa_ore == null ? '' : String(r.pausa_ore),
+      stato: String(r.stato || 'Da approvare'),
+      assegnatoDa: r.assegnato_da || 'Collaboratore / App',
+      note: r.note || '',
+      avs: r.avs,
+      trasferta_chf: r.trasferta_chf || 0,
+      updatedAt: r.updated_at || r.created_at || ''
+    };
+  }
+  async function insertOreSupabase(row){
+    const sb = sbClient();
+    if(!sb) throw new Error('Supabase non collegato: manca supabaseClient.');
+    let lastError = null;
+    for(const stato of STATO_CANDIDATES){
+      const payload = await buildOrePayload(row, stato);
+      const res = await sb.from(TABLE_ORE).insert(payload).select('*').single();
+      if(!res.error) return res.data;
+      lastError = res.error;
+      const msg = fmtErr(res.error).toLowerCase();
+      if(!msg.includes('stato') && !msg.includes('enum') && !msg.includes('invalid input value')) break;
+    }
+    throw lastError;
+  }
+  function pushLocal(row, oldData){
+    window.economia = window.economia || (typeof economia !== 'undefined' ? economia : null) || {ore:[], materiali:[], preventivi:{}, preventiviGenerali:{}};
+    if(!Array.isArray(window.economia.ore)) window.economia.ore = [];
+    try{ if(typeof economia !== 'undefined' && economia) window.economia = economia; }catch(e){}
+    window.economia.ore.push(row);
+    try{ if(typeof economia !== 'undefined' && economia && economia !== window.economia) economia.ore = window.economia.ore; }catch(e){}
+    try{ updateWorkerTimesheetEntry(row.data,row.cantiere,row.ore,row.da,row.a,row.pausa,row.idCat,row.lavorazione,oldData,row.tipo,row.stato); }catch(e){}
+    try{ econSave(); }catch(e){}
+    try{ renderEconomia(false); }catch(e){}
+    try{ renderRaccoltaOperai(); }catch(e){}
+    try{ renderAdminPresenzeOggi(); }catch(e){}
+    try{ renderAdminMonthPanel(); }catch(e){}
+  }
+  async function saveOreComune(opts){
+    const p = getCurrentUser() || {};
+    const collaboratore = p.nome || p.email || 'Collaboratore';
+    const data = cleanDate(opts.data);
+    const ore = toNumber(opts.ore, 0);
+    if(!ore || ore <= 0){ alert('Inserisci le ore.'); return; }
+    if(typeof validaRegoleOrarieOperaio === 'function'){
+      const ok = validaRegoleOrarieOperaio(data, ore, opts.da || '', opts.a || '', opts.pausa || '', collaboratore);
+      if(!ok) return;
+    }
+    const tipo = opts.tipo || (typeof tipoEconomicoDaIdCategoria === 'function' ? tipoEconomicoDaIdCategoria(opts.idCatText, opts.lavorazione) : 'altro');
+    const row = {
+      data,
+      cantiere: opts.cantiere,
+      collaboratore,
+      collaboratore_id: p.id || null,
+      idCat: opts.idCatText,
+      lavorazione: opts.lavorazione || '',
+      tipo,
+      ore,
+      da: opts.da || '',
+      a: opts.a || '',
+      pausa: opts.pausa || 0,
+      stato: 'Da approvare',
+      assegnatoDa: 'Collaboratore / App',
+      note: opts.note || '',
+      trasferta_chf: 0
+    };
+    try{
+      const saved = await insertOreSupabase(row);
+      row.supabase_id = saved.id;
+      pushLocal(row);
+      try{ closeWorkerWindow(); }catch(e){}
+      alert('Ore salvate correttamente online nella tabella ore_lavoro. Ora l\'admin le vede nella raccolta ore.');
+    }catch(e){
+      console.error('Errore salvataggio ore_lavoro', e);
+      pushLocal(row);
+      alert('Ore salvate solo su questo dispositivo, ma NON online. Tabella usata: ore_lavoro. Errore: ' + fmtErr(e));
+    }
+  }
+
+  window.salvaOreCollegate = async function(){
+    const data = document.getElementById('dataOre')?.value || (typeof localTodayIso === 'function' ? localTodayIso() : new Date().toISOString().slice(0,10));
+    const cantiereText = document.getElementById('operaioCantiereSelect')?.value || 'Lugano Centro - attivo';
+    const cantiere = cantiereText.replace(' - attivo','');
+    const idCatText = document.getElementById('categoriaSelect')?.selectedOptions?.[0]?.textContent || '100 — Cartongesso';
+    const lavorazione = document.getElementById('lavorazioneSelect')?.value || '';
+    await saveOreComune({
+      data,
+      cantiere,
+      idCatText,
+      lavorazione,
+      ore: document.getElementById('oreDesktop')?.value || 0,
+      da: document.getElementById('oraDaDesktop')?.value || '',
+      a: document.getElementById('oraADesktop')?.value || '',
+      pausa: document.getElementById('pausaDesktop')?.value || 0,
+      note: document.querySelector('#formOre textarea')?.value || ''
+    });
+  };
+
+  window.salvaOreMobileCollegate = async function(){
+    const data = document.getElementById('mDataOre')?.value || (typeof localTodayIso === 'function' ? localTodayIso() : new Date().toISOString().slice(0,10));
+    const cantiereText = document.getElementById('mCantiere')?.value || 'Lugano Centro - attivo';
+    const cantiere = cantiereText.replace(' - attivo','');
+    const idCatText = document.getElementById('mCategoria')?.selectedOptions?.[0]?.textContent || '100 — Cartongesso';
+    const lavorazione = document.getElementById('mLavorazione')?.value || '';
+    await saveOreComune({
+      data,
+      cantiere,
+      idCatText,
+      lavorazione,
+      ore: document.getElementById('mOre')?.value || 0,
+      da: document.getElementById('mOraDa')?.value || '',
+      a: document.getElementById('mOraA')?.value || '',
+      pausa: document.getElementById('mPausa')?.value || 0,
+      note: noteFrom('mOreNote')
+    });
+  };
+
+  window.tpCaricaOreCollaboratoriSupabase = async function(showAlert){
+    const sb = sbClient();
+    if(!sb){ if(showAlert) alert('Supabase non collegato.'); return []; }
+    let res = await sb.from(VIEW_ORE).select('*').order('data', {ascending:false}).limit(2000);
+    if(res.error){
+      console.warn('Vista non leggibile, uso tabella ore_lavoro', res.error);
+      res = await sb.from(TABLE_ORE).select('*').order('data', {ascending:false}).order('created_at', {ascending:false}).limit(2000);
+    }
+    if(res.error){
+      console.error('Errore caricamento ore_lavoro', res.error);
+      if(showAlert) alert('Errore caricamento ore online: ' + fmtErr(res.error));
+      return [];
+    }
+    const rows = (res.data || []).map(supaToLocal);
+    window.economia = window.economia || (typeof economia !== 'undefined' ? economia : null) || {ore:[], materiali:[], preventivi:{}, preventiviGenerali:{}};
+    window.economia.ore = rows;
+    try{ if(typeof economia !== 'undefined' && economia) economia.ore = rows; }catch(e){}
+    try{ econSave(); }catch(e){}
+    try{ renderEconomia(false); }catch(e){}
+    try{ renderRaccoltaOperai(); }catch(e){}
+    try{ renderAdminPresenzeOggi(); }catch(e){}
+    try{ renderAdminMonthPanel(); }catch(e){}
+    if(showAlert) alert('Ore caricate online da ore_lavoro: ' + rows.length);
+    return rows;
+  };
+
+  function addAdminReloadButton(){
+    if(window.TP_PAGE_MODE !== 'admin') return;
+    if(document.getElementById('tpReloadOreOnlineBtn')) return;
+    const host = document.querySelector('#ore .card') || document.querySelector('#admin .card') || document.querySelector('main');
+    if(!host) return;
+    const div = document.createElement('div');
+    div.style.margin = '10px 0';
+    div.innerHTML = '<button id="tpReloadOreOnlineBtn" class="primary" type="button" onclick="tpCaricaOreCollaboratoriSupabase(true)">Ricarica ore online da ore_lavoro</button>';
+    host.prepend(div);
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(addAdminReloadButton, 800);
+    if(window.TP_PAGE_MODE === 'admin') setTimeout(function(){ tpCaricaOreCollaboratoriSupabase(false); }, 1200);
+  });
+  window.addEventListener('load', function(){
+    setTimeout(addAdminReloadButton, 1200);
+    if(window.TP_PAGE_MODE === 'admin') setTimeout(function(){ tpCaricaOreCollaboratoriSupabase(false); }, 1800);
+  });
+})();
