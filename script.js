@@ -5756,3 +5756,155 @@ window.tpLogoutTecnoplafonFinale = async function(){
     if(window.TP_PAGE_MODE === 'admin') setTimeout(function(){ tpCaricaOreCollaboratoriSupabase(false); }, 1800);
   });
 })();
+
+/* ===== V71 - Admin vede ore_lavoro: lettura diretta + risoluzione nomi + tabella visibile ===== */
+(function(){
+  const TABLE_ORE = 'ore_lavoro';
+  const VIEW_ORE = 'v_ore_lavoro_complete';
+  const LOOKUPS = {
+    collaboratori: 'collaboratori',
+    cantieri: 'cantieri',
+    categorie: 'categorie_lavoro',
+    lavorazioni: 'lavorazioni',
+    tipologie: 'tipologie_economiche'
+  };
+
+  function sb(){ return window.supabaseClient || (typeof supabaseClient !== 'undefined' ? supabaseClient : null); }
+  function fmtErr(e){ return (e && (e.message || e.details || e.hint || e.code)) ? [e.message,e.details,e.hint,e.code].filter(Boolean).join(' - ') : String(e || 'Errore sconosciuto'); }
+  function cleanDate(d){
+    d = String(d || '');
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    if(/^\d{2}\.\d{2}\.\d{4}$/.test(d)){ const p=d.split('.'); return p[2]+'-'+p[1]+'-'+p[0]; }
+    return d;
+  }
+  function num(v){ const n = Number(String(v ?? 0).replace(',', '.')); return Number.isFinite(n) ? n : 0; }
+  function val(o, names, def){
+    for(const n of names){ if(o && o[n] !== undefined && o[n] !== null && o[n] !== '') return o[n]; }
+    return def || '';
+  }
+  function nameFromRow(r){
+    const code = val(r, ['codice','numero','id_numero','code'], '');
+    const name = val(r, ['nome','name','titolo','title','descrizione','label','categoria','tipo','indirizzo','email'], '');
+    if(code && name) return code + ' — ' + name;
+    return name || code || '';
+  }
+  async function all(table){
+    const client = sb();
+    if(!client) return [];
+    const res = await client.from(table).select('*').limit(5000);
+    if(res.error){ console.warn('Lookup fallito '+table, res.error); return []; }
+    return res.data || [];
+  }
+  async function buildMaps(){
+    const maps = {collaboratori:{}, cantieri:{}, categorie:{}, lavorazioni:{}, tipologie:{}};
+    const entries = await Promise.all([
+      all(LOOKUPS.collaboratori), all(LOOKUPS.cantieri), all(LOOKUPS.categorie), all(LOOKUPS.lavorazioni), all(LOOKUPS.tipologie)
+    ]);
+    ['collaboratori','cantieri','categorie','lavorazioni','tipologie'].forEach((key,i)=>{
+      entries[i].forEach(r=>{ if(r.id) maps[key][r.id] = nameFromRow(r); });
+    });
+    return maps;
+  }
+  function statoReadable(s){ return String(s || 'Da approvare').replaceAll('_',' '); }
+  function supaToLocalV71(r, maps){
+    const collaboratore = val(r, ['collaboratore','collaboratore_nome','nome_collaboratore','collaboratori_nome','nome'], '') || maps.collaboratori[r.collaboratore_id] || r.collaboratore_id || '';
+    const cantiere = val(r, ['cantiere','cantiere_nome','nome_cantiere','cantieri_nome'], '') || maps.cantieri[r.cantiere_id] || r.cantiere_id || '';
+    const catCode = val(r, ['categoria_codice','codice_categoria','codice','id_cat'], '');
+    const catName = val(r, ['categoria_lavoro','categoria_nome','nome_categoria','categoria'], '') || maps.categorie[r.categoria_lavoro_id] || '';
+    const idCat = [catCode, catName].filter(Boolean).join(' — ') || catName || r.categoria_lavoro_id || '';
+    const lavorazione = val(r, ['lavorazione','lavorazione_nome','nome_lavorazione'], '') || maps.lavorazioni[r.lavorazione_id] || r.lavorazione_id || '';
+    const tipo = val(r, ['tipologia_economica','tipologia_nome','tipo','tipo_economico'], '') || maps.tipologie[r.tipologia_economica_id] || r.tipologia_economica_id || '';
+    return {
+      supabase_id: r.id,
+      data: cleanDate(r.data),
+      cantiere,
+      cantiere_id: r.cantiere_id || '',
+      collaboratore,
+      collaboratore_id: r.collaboratore_id || '',
+      idCat,
+      categoria_lavoro_id: r.categoria_lavoro_id || '',
+      lavorazione,
+      lavorazione_id: r.lavorazione_id || '',
+      tipo,
+      tipologia_economica_id: r.tipologia_economica_id || '',
+      ore: num(r.ore),
+      da: r.ora_da || '',
+      a: r.ora_a || '',
+      pausa: r.pausa_ore == null ? '' : String(r.pausa_ore),
+      stato: statoReadable(r.stato),
+      assegnatoDa: r.assegnato_da || 'Collaboratore / App',
+      note: r.note || '',
+      avs: r.avs,
+      trasferta_chf: num(r.trasferta_chf),
+      updatedAt: r.updated_at || r.created_at || ''
+    };
+  }
+  function esc(s){ return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function renderOreOnlinePanel(rows, msg){
+    if(window.TP_PAGE_MODE !== 'admin') return;
+    let box = document.getElementById('tpOreOnlinePanelV71');
+    const host = document.querySelector('#ore .card') || document.querySelector('#admin .card') || document.querySelector('main');
+    if(!host) return;
+    if(!box){
+      box = document.createElement('div');
+      box.id = 'tpOreOnlinePanelV71';
+      box.className = 'card';
+      box.style.margin = '0 0 16px 0';
+      box.innerHTML = '<h3>Ore online da Supabase</h3><div class="admin-actions" style="margin-bottom:10px"><button class="primary" type="button" onclick="tpCaricaOreCollaboratoriSupabase(true)">Ricarica ore online</button></div><div id="tpOreOnlineMsgV71" class="mini-note"></div><div class="trend-table-wrap"><table id="tpOreOnlineTableV71" class="trend-table"></table></div>';
+      host.prepend(box);
+    }
+    const m = document.getElementById('tpOreOnlineMsgV71');
+    if(m) m.textContent = msg || ('Righe trovate: ' + rows.length);
+    const t = document.getElementById('tpOreOnlineTableV71');
+    if(!t) return;
+    if(!rows.length){
+      t.innerHTML = '<tr><td>Nessuna ora trovata online. Se in Supabase vedi righe, esegui il file SQL incluso per autorizzare la lettura dal browser.</td></tr>';
+      return;
+    }
+    t.innerHTML = '<thead><tr><th>Data</th><th>Collaboratore</th><th>Cantiere</th><th>Categoria</th><th>Lavorazione</th><th>Ore</th><th>Stato</th></tr></thead><tbody>' +
+      rows.map(r => '<tr><td>'+esc(r.data)+'</td><td>'+esc(r.collaboratore)+'</td><td>'+esc(r.cantiere)+'</td><td>'+esc(r.idCat)+'</td><td>'+esc(r.lavorazione)+'</td><td class="num">'+esc(r.ore)+'</td><td>'+esc(r.stato)+'</td></tr>').join('') + '</tbody>';
+  }
+
+  window.tpCaricaOreCollaboratoriSupabase = async function(showAlert){
+    const client = sb();
+    if(!client){ if(showAlert) alert('Supabase non collegato.'); return []; }
+    let source = VIEW_ORE;
+    let res = await client.from(VIEW_ORE).select('*').order('data', {ascending:false}).limit(5000);
+    if(res.error){
+      console.warn('Vista non leggibile, uso tabella ore_lavoro', res.error);
+      source = TABLE_ORE;
+      res = await client.from(TABLE_ORE).select('*').order('data', {ascending:false}).order('created_at', {ascending:false}).limit(5000);
+    }
+    if(res.error){
+      const msg = 'Errore caricamento ore online: ' + fmtErr(res.error);
+      console.error(msg, res.error);
+      renderOreOnlinePanel([], msg);
+      if(showAlert) alert(msg + '\n\nSe in Supabase le righe esistono, esegui il file SQL incluso: SUPABASE_PERMETTI_ADMIN_LETTURA_ORE.sql');
+      return [];
+    }
+    const maps = await buildMaps();
+    const rows = (res.data || []).map(r => supaToLocalV71(r, maps));
+    window.economia = window.economia || (typeof economia !== 'undefined' ? economia : null) || {ore:[], materiali:[], preventivi:{}, preventiviGenerali:{}};
+    window.economia.ore = rows;
+    try{ if(typeof economia !== 'undefined' && economia) economia.ore = rows; }catch(e){}
+    try{ econSave(); }catch(e){}
+    try{ renderEconomia(false); }catch(e){}
+    try{ renderRaccoltaOperai(); }catch(e){}
+    try{ renderAdminPresenzeOggi(); }catch(e){}
+    try{ renderAdminMonthPanel(); }catch(e){}
+    try{ popolaLinkedHoursFilters(); renderLinkedHoursPanel(); }catch(e){}
+    const msg = 'Righe caricate da ' + source + ': ' + rows.length;
+    renderOreOnlinePanel(rows, msg);
+    if(showAlert) alert(msg);
+    return rows;
+  };
+
+  function init(){
+    if(window.TP_PAGE_MODE === 'admin'){
+      renderOreOnlinePanel([], 'Premi Ricarica ore online per leggere Supabase.');
+      setTimeout(function(){ window.tpCaricaOreCollaboratoriSupabase(false); }, 900);
+    }
+  }
+  document.addEventListener('DOMContentLoaded', init);
+  window.addEventListener('load', function(){ setTimeout(init, 600); });
+})();
