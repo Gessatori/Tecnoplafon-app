@@ -83,10 +83,12 @@ const titles = {
     window.scrollTo({top:0,behavior:'smooth'});
   }
   function aggiornaLavorazioni(){
-    const id = document.getElementById('categoriaSelect').value;
+    const catEl = document.getElementById('categoriaSelect');
     const select = document.getElementById('lavorazioneSelect');
+    if(!catEl || !select) return;
+    const id = catEl.value;
     select.innerHTML = "";
-    lavorazioni[id].forEach(v=>{
+    (lavorazioni[id] || []).forEach(v=>{
       const opt=document.createElement('option');
       opt.textContent=v;
       select.appendChild(opt);
@@ -102,6 +104,7 @@ const titles = {
   function buildCalendar(target, admin=false){
     const names=["Lun","Mar","Mer","Gio","Ven","Sab","Dom"];
     const box=document.getElementById(target);
+    if(!box) return;
     box.innerHTML="";
     names.forEach(n=>{
       const d=document.createElement('div');
@@ -131,24 +134,26 @@ const titles = {
   }
   const today = localTodayIso();
   document.addEventListener("DOMContentLoaded",()=>{
-    document.getElementById('dataOre').value=today;
+    const safeInit = (fn)=>{ try{ if(typeof fn === 'function') fn(); }catch(e){ console.warn('Tecnoplafon init:', e); } };
+    const dataOre = document.getElementById('dataOre');
+    if(dataOre) dataOre.value=today;
     const dataOreEl = document.getElementById('dataOre');
     if(dataOreEl){ dataOreEl.min = today; dataOreEl.max = today; dataOreEl.title = 'Le ore si possono segnare solo oggi.'; }
-    aggiornaLavorazioni();
-    buildCalendar("calendarOperaio", false);
-    buildCalendar("calendarAdmin", true);
-    popolaSelectEconomici();
-    renderEconomia();
-    renderAdminData();
-    calcolaOreDesktop();
-    renderWorkerTimesheet();
-    popolaFiltriAndamento();
-    renderAndamentoCantiere();
-    popolaLinkedHoursFilters();
-    renderLinkedHoursPanel();
-    popolaRaccoltaOperaiSelect();
-    renderRaccoltaOperai();
-    initAdminMonthPanel();
+    safeInit(aggiornaLavorazioni);
+    safeInit(()=>buildCalendar("calendarOperaio", false));
+    safeInit(()=>buildCalendar("calendarAdmin", true));
+    safeInit(popolaSelectEconomici);
+    safeInit(renderEconomia);
+    safeInit(renderAdminData);
+    safeInit(calcolaOreDesktop);
+    safeInit(renderWorkerTimesheet);
+    safeInit(popolaFiltriAndamento);
+    safeInit(renderAndamentoCantiere);
+    safeInit(popolaLinkedHoursFilters);
+    safeInit(renderLinkedHoursPanel);
+    safeInit(popolaRaccoltaOperaiSelect);
+    safeInit(renderRaccoltaOperai);
+    safeInit(initAdminMonthPanel);
   });
 
   const ECON_TIPI = [
