@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tecnoplafon - Gestione Ore Collaboratori v49 - Weekend prova senza regola</title>
+  <title>Tecnoplafon - Gestione Ore Collaboratori v52 - Senza script esterno e weekend sbloccato</title>
   <style>
     :root{
       --bg:#f4f7fb;
@@ -8305,9 +8305,172 @@ window.TP_PAGE_MODE="admin";
 
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="script.js"></script>
+<!-- v52: script.js esterno disattivato per evitare vecchio blocco weekend. -->
+
+<script>
+/* v50 - Override definitivo dopo script.js: sabato/domenica permessi anche se script.js o localStorage hanno ancora weekend=blocca. */
+(function(){
+  function safeParse(raw){ try{return raw ? JSON.parse(raw) : null;}catch(e){return null;} }
+  function saveWeekendPermesso(){
+    try{
+      var key = "tecnoplafon_admin_month_state_v1";
+      var st = safeParse(localStorage.getItem(key));
+      if(st){
+        st.rules = st.rules || {};
+        st.rules.weekend = "permetti";
+        localStorage.setItem(key, JSON.stringify(st));
+      }
+      if(window.adminMonthState){
+        window.adminMonthState.rules = window.adminMonthState.rules || {};
+        window.adminMonthState.rules.weekend = "permetti";
+      }
+    }catch(e){}
+  }
+  saveWeekendPermesso();
+
+  window.oreGiornoPrevisteAdmin = function(data){
+    var dIso = (typeof isoDateOnly === 'function' ? isoDateOnly(data) : String(data || '').slice(0,10));
+    if(dIso){
+      var d = new Date(dIso + "T12:00:00");
+      if(d.getDay() === 0 || d.getDay() === 6) return 0;
+    }
+    var r = (window.adminMonthState && window.adminMonthState.rules) || {};
+    var stagione = (typeof stagioneAdminPerData === 'function') ? stagioneAdminPerData(data) : 'invernale';
+    var val = stagione === "estivo" ? Number(r.oreEstate || 0) : Number(r.oreInverno || 0);
+    return Number.isFinite(val) && val > 0 ? val : Number(r.maxOre || 0);
+  };
+
+  window.validaRegoleOrarieOperaio = function(data, ore, da, a, pausa, collaboratore){
+    saveWeekendPermesso();
+    var r = (window.adminMonthState && window.adminMonthState.rules) || {maxOre:10, pausaMin:0, soloOggi:"si", weekend:"permetti"};
+    r.weekend = "permetti";
+    var msg = [];
+    var dataIso = (typeof isoDateOnly === 'function') ? isoDateOnly(data) : String(data || '').slice(0,10);
+    var oggiIso = (typeof localTodayIso === 'function') ? localTodayIso() : new Date().toISOString().slice(0,10);
+
+    if(!dataIso){
+      msg.push("Inserisci una data valida.");
+    } else if((r.soloOggi || "si") === "si" && dataIso !== oggiIso){
+      if(dataIso < oggiIso) msg.push("Non puoi segnare ore di ieri o di giorni passati: le ore si segnano lo stesso giorno secondo le regole admin.");
+      if(dataIso > oggiIso) msg.push("Non puoi segnare ore di domani o di giorni futuri: le ore si segnano lo stesso giorno secondo le regole admin.");
+    }
+
+    var blocco = (typeof vacanzaORegolaBloccante === 'function') ? vacanzaORegolaBloccante(dataIso, collaboratore || "Operaio demo") : null;
+    if(blocco){
+      msg.push((blocco.festivo ? "Giorno festivo" : "Vacanza / assenza assegnata") + " bloccata: " + blocco.tipo + (blocco.note ? " - " + blocco.note : "") + ". Nessun inserimento ore consentito.");
+    }
+
+    var orePrevisteAdmin = window.oreGiornoPrevisteAdmin(dataIso || oggiIso);
+    var giaSegnate = (typeof oreGiaSegnateCollaboratoreGiorno === 'function') ? oreGiaSegnateCollaboratoreGiorno(collaboratore || "Operaio demo", dataIso) : 0;
+    var totaleDopoInserimento = giaSegnate + Number(ore || 0);
+    if(orePrevisteAdmin > 0 && totaleDopoInserimento > orePrevisteAdmin + 0.001){
+      var fmt = (typeof econFmt === 'function') ? econFmt : function(x){return String(x)};
+      var stagione = (typeof stagioneAdminPerData === 'function') ? stagioneAdminPerData(dataIso || oggiIso) : '';
+      msg.push("Totale ore del giorno superato: regola admin " + fmt(orePrevisteAdmin) + " h (" + stagione + "), già segnate " + fmt(giaSegnate) + " h, stai inserendo " + fmt(ore) + " h.");
+    }
+    if(Number(ore||0) > Number(r.maxOre||99)) msg.push("Massimo ore giornaliere consentito: " + r.maxOre + ".");
+    if(da && r.oraMin && typeof timeToMin === 'function' && timeToMin(da) < timeToMin(r.oraMin)) msg.push("Entrata prima dell'orario minimo (" + r.oraMin + ").");
+    if(a && r.oraMax && typeof timeToMin === 'function' && timeToMin(a) > timeToMin(r.oraMax)) msg.push("Uscita oltre l'orario massimo (" + r.oraMax + ").");
+    if((da || a) && Number(pausa||0) < Number(r.pausaMin||0)) msg.push("Pausa minima richiesta: " + r.pausaMin + " ore.");
+
+    /* Nessun controllo weekend qui: sabato e domenica sono permessi per la prova. */
+    if(msg.length){ alert("Inserimento ore bloccato:\n- " + msg.join("\n- ")); return false; }
+    return true;
+  };
+})();
+</script>
+<!-- v50: override finale dopo script.js, weekend sempre permesso per la prova. -->
+
 <!-- v41: Fix modifica dopo login admin - il pulsante Modifica memorizza la riga, apre login se serve e poi carica davvero ore, cantiere, lavorazione e tipologia del lavoro. -->
 <!-- fix v68: admin apre direttamente Area admin e non Area operaio -->
+
+
+<script>
+/* v51 - Fix: il pulsante "Vai al login" ora sblocca direttamente l'area admin.
+   Serve quando il file e pubblicato da solo e non esiste/ non funziona index.html. */
+(function(){
+  function setAdminUnlockedAndOpen(){
+    try{ sessionStorage.setItem("tecnoplafonAdminUnlocked", "1"); }catch(e){}
+    try{ window.adminUnlocked = true; }catch(e){}
+    var panel = document.getElementById('adminAccessPanel');
+    if(panel){ panel.classList.remove('open'); panel.style.display = 'none'; }
+    document.body.classList.remove('worker-view');
+    document.body.classList.add('admin-view');
+    if(typeof showSection === 'function'){
+      try{ showSection('admin'); }catch(e){}
+    }
+  }
+
+  window.vaiAlLoginSicuro = setAdminUnlockedAndOpen;
+  window.adminLoginSubmit = setAdminUnlockedAndOpen;
+
+  window.logoutAdmin = function(){
+    try{ sessionStorage.removeItem("tecnoplafonAdminUnlocked"); }catch(e){}
+    try{ sessionStorage.removeItem('tp_current_user_v66'); localStorage.removeItem('tp_current_user_v66'); }catch(e){}
+    try{ window.adminUnlocked = false; }catch(e){}
+    if(typeof showSection === 'function'){
+      showSection('operaio');
+    }else{
+      document.body.classList.add('worker-view');
+      document.body.classList.remove('admin-view');
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', function(){
+    var box = document.querySelector('#adminAccessPanel .admin-access-box');
+    var title = box ? box.querySelector('h3') : null;
+    var text = box ? box.querySelector('p') : null;
+    var err = document.getElementById('adminAccessError');
+    var btns = box ? box.querySelectorAll('button') : [];
+    if(title) title.textContent = '🔐 Accesso admin';
+    if(text) text.textContent = 'Premi Entra admin per aprire l’area amministratore in questo file.';
+    if(err){ err.textContent = 'Accesso admin diretto attivo per questa versione di prova.'; err.style.display = 'block'; }
+    if(btns && btns.length >= 2){ btns[1].textContent = 'Entra admin'; }
+  });
+})();
+</script>
+<!-- v51: login admin diretto ripristinato per file pubblicato singolo. -->
+
+
+<script>
+/* v52 - Sicurezza finale: disattiva qualsiasi vecchio blocco weekend rimasto in cache o in script esterni. */
+(function(){
+  var weekendMsg = "Sabato e domenica sono bloccati dalle regole admin";
+  var oldAlert = window.alert;
+  window.alert = function(msg){
+    try{
+      if(String(msg || '').indexOf(weekendMsg) !== -1){
+        console.warn('Blocco weekend ignorato dalla versione v52.');
+        return;
+      }
+    }catch(e){}
+    return oldAlert.apply(window, arguments);
+  };
+  function patchState(){
+    try{
+      var key = 'tecnoplafon_admin_month_state_v1';
+      var raw = localStorage.getItem(key);
+      if(raw){
+        var st = JSON.parse(raw);
+        st.rules = st.rules || {};
+        st.rules.weekend = 'permetti';
+        st.weekend_bloccato = false;
+        localStorage.setItem(key, JSON.stringify(st));
+      }
+    }catch(e){}
+    try{
+      if(window.adminMonthState){
+        window.adminMonthState.rules = window.adminMonthState.rules || {};
+        window.adminMonthState.rules.weekend = 'permetti';
+        window.adminMonthState.weekend_bloccato = false;
+      }
+    }catch(e){}
+  }
+  patchState();
+  setInterval(patchState, 1000);
+})();
+</script>
+
 </body>
 </html>
 
