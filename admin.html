@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tecnoplafon - Gestione Ore Collaboratori v47 - Regole finali</title>
+  <title>Tecnoplafon - Gestione Ore Collaboratori v49 - Weekend prova senza regola</title>
   <style>
     :root{
       --bg:#f4f7fb;
@@ -5428,7 +5428,6 @@ window.TP_PAGE_MODE="admin";
                 <div class="f3"><label>Estate da mese</label><select id="ruleEstateDa"><option value="1">Gennaio</option><option value="2">Febbraio</option><option value="3">Marzo</option><option value="4" selected>Aprile</option><option value="5">Maggio</option><option value="6">Giugno</option><option value="7">Luglio</option><option value="8">Agosto</option><option value="9">Settembre</option><option value="10">Ottobre</option><option value="11">Novembre</option><option value="12">Dicembre</option></select></div>
                 <div class="f3"><label>Estate a mese</label><select id="ruleEstateA"><option value="1">Gennaio</option><option value="2">Febbraio</option><option value="3">Marzo</option><option value="4">Aprile</option><option value="5">Maggio</option><option value="6">Giugno</option><option value="7">Luglio</option><option value="8">Agosto</option><option value="9">Settembre</option><option value="10" selected>Ottobre</option><option value="11">Novembre</option><option value="12">Dicembre</option></select></div>
                 <div class="f3"><label>Solo giorno corrente</label><select id="ruleSoloOggi"><option value="si">Sì</option><option value="no">No</option></select></div>
-                <div class="f3"><label>Sabato / domenica</label><select id="ruleWeekend"><option value="blocca">Blocca</option><option value="avvisa">Avvisa solo</option><option value="permetti">Permetti</option></select></div>
                 <div class="f6"><label>Nota regola</label><input id="ruleNota" placeholder="Es. orario standard 07:00 - 16:00 con 1 ora pausa"></div>
                 <div class="f12"><button class="primary" onclick="salvaRegoleOrariAdmin()">Salva regole orari</button></div>
               </div>
@@ -5480,8 +5479,6 @@ window.TP_PAGE_MODE="admin";
         <div class="card span-6">
           <h3>Calendario annuale aziendale</h3>
           <div class="pill-row">
-            <span class="pill">Sabato non lavorativo</span>
-            <span class="pill">Domenica non lavorativa</span>
             <span class="pill">Festivi bloccati</span>
             <span class="pill">Chiusure aziendali</span>
             <span class="pill">Vacanze obbligatorie</span>
@@ -5492,7 +5489,6 @@ window.TP_PAGE_MODE="admin";
             <tbody>
               <tr><td>01.08.2026</td><td>Festivo</td><td>Blocco inserimento ore</td></tr>
               <tr><td>24.12–06.01</td><td>Chiusura aziendale</td><td>Vacanze obbligatorie</td></tr>
-              <tr><td>Ogni domenica</td><td>Non lavorativo</td><td>Blocco salvo autorizzazione</td></tr>
             </tbody>
           </table>
         </div>
@@ -7459,10 +7455,11 @@ window.TP_PAGE_MODE="admin";
     tab: "ore",
     vacanze: [],
     fixedTotals: {},
-    rules: {oraMin:"06:00", oraMax:"19:00", pausaMin:0.5, maxOre:10, oreInverno:8, oreEstate:8.5, estateDa:4, estateA:10, soloOggi:"si", weekend:"blocca", nota:"Orario standard controllato dall'admin."}
+    rules: {oraMin:"06:00", oraMax:"19:00", pausaMin:0.5, maxOre:10, oreInverno:8, oreEstate:8.5, estateDa:4, estateA:10, soloOggi:"si", nota:"Orario standard controllato dall'admin."}
   };
   adminMonthState.fixedTotals = adminMonthState.fixedTotals || {};
-  adminMonthState.rules = Object.assign({oraMin:"06:00", oraMax:"19:00", pausaMin:0.5, maxOre:10, oreInverno:8, oreEstate:8.5, estateDa:4, estateA:10, soloOggi:"si", weekend:"blocca", nota:"Orario standard controllato dall'admin."}, adminMonthState.rules || {});
+  adminMonthState.rules = Object.assign({oraMin:"06:00", oraMax:"19:00", pausaMin:0.5, maxOre:10, oreInverno:8, oreEstate:8.5, estateDa:4, estateA:10, soloOggi:"si", nota:"Orario standard controllato dall'admin."}, adminMonthState.rules || {});
+  delete adminMonthState.rules.weekend;
   let adminOreEditIndex = null;
 
   function saveAdminMonthState(){ localStorage.setItem("tecnoplafon_admin_month_state_v1", JSON.stringify(adminMonthState)); }
@@ -7889,7 +7886,7 @@ window.TP_PAGE_MODE="admin";
 
   function loadRulesIntoForm(){
     const r = adminMonthState.rules || {};
-    [["ruleOraMin",r.oraMin],["ruleOraMax",r.oraMax],["rulePausaMin",r.pausaMin],["ruleMaxOre",r.maxOre],["ruleOreInverno",r.oreInverno],["ruleOreEstate",r.oreEstate],["ruleEstateDa",r.estateDa],["ruleEstateA",r.estateA],["ruleSoloOggi",r.soloOggi],["ruleWeekend",r.weekend],["ruleNota",r.nota]].forEach(([id,val])=>{
+    [["ruleOraMin",r.oraMin],["ruleOraMax",r.oraMax],["rulePausaMin",r.pausaMin],["ruleMaxOre",r.maxOre],["ruleOreInverno",r.oreInverno],["ruleOreEstate",r.oreEstate],["ruleEstateDa",r.estateDa],["ruleEstateA",r.estateA],["ruleSoloOggi",r.soloOggi],["ruleNota",r.nota]].forEach(([id,val])=>{
       const el=document.getElementById(id); if(el && val !== undefined) el.value = val;
     });
     renderRulesPreview();
@@ -7906,7 +7903,6 @@ window.TP_PAGE_MODE="admin";
       estateDa:Number(document.getElementById("ruleEstateDa")?.value || 4),
       estateA:Number(document.getElementById("ruleEstateA")?.value || 10),
       soloOggi:document.getElementById("ruleSoloOggi")?.value || "si",
-      weekend:document.getElementById("ruleWeekend")?.value || "blocca",
       nota:document.getElementById("ruleNota")?.value || ""
     };
     saveAdminMonthState(); renderRulesPreview(); renderAdminMonthPanel();
@@ -7920,7 +7916,7 @@ window.TP_PAGE_MODE="admin";
     const oggi = localTodayIso();
     const prev = oreGiornoPrevisteAdmin(oggi);
     const stagione = stagioneAdminPerData(oggi);
-    box.innerHTML = `<span>Entrata da ${r.oraMin}</span><span>Uscita max ${r.oraMax}</span><span>Pausa min ${r.pausaMin} h</span><span>Max ${r.maxOre} h/giorno</span><span>Totale oggi admin: ${econFmt(prev)} h (${stagione})</span><span>Inverno ${r.oreInverno || 0} h</span><span>Estate ${r.oreEstate || 0} h</span><span>Solo oggi: ${r.soloOggi === "si" ? "Sì" : "No"}</span><span>Weekend: ${r.weekend}</span>`;
+    box.innerHTML = `<span>Entrata da ${r.oraMin}</span><span>Uscita max ${r.oraMax}</span><span>Pausa min ${r.pausaMin} h</span><span>Max ${r.maxOre} h/giorno</span><span>Totale oggi admin: ${econFmt(prev)} h (${stagione})</span><span>Inverno ${r.oreInverno || 0} h</span><span>Estate ${r.oreEstate || 0} h</span><span>Solo oggi: ${r.soloOggi === "si" ? "Sì" : "No"}</span><span>Weekend: nessuna regola attiva</span>`;
   }
 
   function meseInIntervalloAdmin(mese, da, a){
@@ -7937,6 +7933,11 @@ window.TP_PAGE_MODE="admin";
   }
 
   function oreGiornoPrevisteAdmin(data){
+    const dIso = isoDateOnly(data);
+    if(dIso){
+      const d = new Date(dIso + "T12:00:00");
+      if(d.getDay() === 0 || d.getDay() === 6) return 0; // Weekend in prova: nessuna ora obbligatoria da segnare.
+    }
     const r = adminMonthState.rules || {};
     const stagione = stagioneAdminPerData(data);
     const val = stagione === "estivo" ? Number(r.oreEstate || 0) : Number(r.oreInverno || 0);
@@ -7984,7 +7985,7 @@ window.TP_PAGE_MODE="admin";
   }
 
   function validaRegoleOrarieOperaio(data, ore, da, a, pausa, collaboratore){
-    const r = adminMonthState.rules || {maxOre:10, pausaMin:0, soloOggi:"si", weekend:"blocca"};
+    const r = adminMonthState.rules || {maxOre:10, pausaMin:0, soloOggi:"si"};
     const msg = [];
     const dataIso = isoDateOnly(data);
     const oggiIso = localTodayIso();
@@ -8009,10 +8010,6 @@ window.TP_PAGE_MODE="admin";
     if(da && r.oraMin && timeToMin(da) < timeToMin(r.oraMin)) msg.push(`Entrata prima dell'orario minimo (${r.oraMin}).`);
     if(a && r.oraMax && timeToMin(a) > timeToMin(r.oraMax)) msg.push(`Uscita oltre l'orario massimo (${r.oraMax}).`);
     if((da || a) && Number(pausa||0) < Number(r.pausaMin||0)) msg.push(`Pausa minima richiesta: ${r.pausaMin} ore.`);
-    if(dataIso && r.weekend === "blocca"){
-      const d = new Date(dataIso + "T12:00:00");
-      if(d.getDay() === 0 || d.getDay() === 6) msg.push("Sabato e domenica sono bloccati dalle regole admin.");
-    }
     if(msg.length){ alert("Inserimento ore bloccato:\n- " + msg.join("\n- ")); return false; }
     return true;
   }
@@ -8315,3 +8312,4 @@ window.TP_PAGE_MODE="admin";
 </html>
 
 <!-- v48: Ore da segnare dettate dalle regole admin. Totale giorno invernale/estivo impostabile dall'admin, calcolo mancanti e blocco superamento ore previste. -->
+<!-- v49: Regola weekend rimossa per prova: sabato e domenica non generano ore obbligatorie e non vengono bloccati dalla validazione oraria. -->
